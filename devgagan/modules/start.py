@@ -109,7 +109,7 @@ help_pages = [
         "> 4. REPLACEWORDS : Can be used for words in deleted set via REMOVE WORDS\n"
         "> 5. RESET : To set the things back to default\n\n"
         "> You can set CUSTOM THUMBNAIL, PDF WATERMARK, VIDEO WATERMARK, SESSION-based login, etc. from settings\n\n"
-        "**__Powered by CHOSEN ONE ⚝__**"
+        "**__Powered By ᴛᴇᴀᴍ  ꫝຮ 亗__**"
     )
 ]
  
@@ -183,7 +183,7 @@ async def terms(client, message):
     buttons = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("📋 See Plans", callback_data="see_plan")],
-            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/GeniusJunctionX")],
+            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/TEAM_A_S_BOT")],
         ]
     )
     await message.reply_text(terms_text, reply_markup=buttons)
@@ -223,7 +223,7 @@ async def plan(client, message):
         "⚡ High Speed 🚀\n"
         "═══════════════════"
         "💰 Better Plans Then others 💯\n\n"
-        "📲 To Upgrade: Contact @CHOSEN_ONEx_bot\n\n"
+        "📲 To Upgrade: Contact @TEAM_A_S_BOT\n\n"
         "💳 Payment via UPI, Amazon Gift Card or USDT\n"
         
     )
@@ -232,7 +232,7 @@ async def plan(client, message):
     buttons = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("📜 See Terms", callback_data="see_terms")],
-            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/CHOSEN_ONEx_bot")],
+            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/TEAM_A_S_BOT")],
         ]
     )
     await message.reply_text(plan_text, reply_markup=buttons)
@@ -251,7 +251,7 @@ async def see_plan(client, callback_query):
     buttons = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("📜 See Terms", callback_data="see_terms")],
-            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/GeniusJunctionX")],
+            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/TEAM_A_S_BOT")],
         ]
     )
     await callback_query.message.edit_text(plan_text, reply_markup=buttons)
@@ -269,7 +269,7 @@ async def see_terms(client, callback_query):
     buttons = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("📋 See Plans", callback_data="see_plan")],
-            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/GeniusJunctionX")],
+            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/TEAM_A_S_BOT")],
         ]
     )
     await callback_query.message.edit_text(terms_text, reply_markup=buttons)
