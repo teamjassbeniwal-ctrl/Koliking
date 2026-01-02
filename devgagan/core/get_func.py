@@ -350,7 +350,7 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
             if chat in saved_channel_ids:
                 await app.edit_message_text(
                     message.chat.id, edit_id,
-                    "This channel is protected By **__ᴛᴇᴀᴍ  ꫝຮ 亗__💀**.\Kya Be... Hamara Hi Content Nikalega 🌝 Kahi Or Try Kar 😘"
+                    "This channel is protected By **__ᴛᴇᴀᴍ  JB__💀**.\?0 Hamara Hi Content Nikalega 🌝 Kahi Or Try Kar 😘"
                 )
                 return
             
@@ -489,14 +489,14 @@ async def handle_sticker(app, msg, target_chat_id, topic_id, edit_id, log_group)
 
 async def get_media_filename(msg):
     if msg.document:
-        return msg.document.file_name or "Document_By_@Src_pro_bot.txt"
+        return msg.document.file_name or "Document_By_@TeamJB_bot.txt"
     if msg.video:
-        return msg.video.file_name or "Video_By_@Src_pro_bot.mp4"
+        return msg.video.file_name or "Video_By_@TeamJB_bot.mp4"
     if msg.audio:
-        return msg.audio.file_name or "Audio_By_@Src_pro_bot.mp3"
+        return msg.audio.file_name or "Audio_By_@TeamJB_bot.mp3"
     if msg.photo:
-        return "Image_By_@Src_pro_bot.jpg"
-    return "File_By_@Src_pro_bot.dat"
+        return "Image_By_@TeamJB_bot.jpg"
+    return "File_By_@TeamJB_bot.dat"
 
 
 
@@ -520,10 +520,10 @@ async def get_final_caption(msg, sender):
     final_caption = f"{original_caption}\n\n{custom_caption}" if custom_caption else original_caption
 
     # Replace @mentions with @Real_Pirates
-    final_caption = re.sub(r'@\w+', '@TEAM_A_S_BOT', final_caption)
+    final_caption = re.sub(r'@\w+', '@TeamJB_bot', final_caption)
 
     # Replace all links with your channel link
-    final_caption = re.sub(r'https?://\S+|www\.\S+', 'https://t.me/+pZZQnMwRZR8yMTZl', final_caption)
+    final_caption = re.sub(r'https?://\S+|www\.\S+', 'https://t.me/teamjb1', final_caption)
 
     # Perform additional replacements from user-defined rules
     replacements = load_replacement_words(sender)
@@ -655,7 +655,7 @@ async def send_media_message(app, target_chat_id, msg, caption, topic_id):
             # If caption exists → keep it same, just replace links if needed
             caption = re.sub(
                 r'https?://t\.me/[^\s]+|https?://telegram\.me/[^\s]+',
-                'https://t.me/+7R-7p7jVoz9mM2M1',
+                'https://t.me/teamjb1',
                 caption
             )
         elif file_name:
@@ -663,7 +663,7 @@ async def send_media_message(app, target_chat_id, msg, caption, topic_id):
             caption = f"🗃 {file_name}"
         else:
             # If nothing → fallback
-            caption = "@II_LevelUP_II"
+            caption = "@TeamJB_bot"
 
         # Send the message with the right method
         if msg.video:
@@ -741,7 +741,7 @@ def format_caption(original_caption, sender, custom_caption):
     # ✅ Replace telegram links
     original_caption = re.sub(
         r'https?://(t\.me|telegram\.me)/[^\s]+',
-        'https://t.me/+7R-7p7jVoz9mM2M1',
+        'https://t.me/teamjb1',
         original_caption
     )
 
@@ -758,14 +758,14 @@ def format_caption(original_caption, sender, custom_caption):
     # ✅ Replace "Downloaded By" with bot handle
     original_caption = re.sub(
         r'(?:<u>)?(Downloaded[\s_]*By\s*[➤:>–\-]*\s*)([^\n<]*)(?:</u>)?',
-        r'\1@Src_pro_bot',
+        r'\1@TeamJB_bot',
         original_caption,
         flags=re.IGNORECASE
     )
     
     original_caption = re.sub(
         r'(⏫)?\s*<u>?\s*(Uploaded[\s_]*By)\s*[➤:>–\-]*\s*[^<\n]+</u>?',
-        r'⏫ Uploaded By ➤ ᴛᴇᴀᴍ ꫝຮ 亗',
+        r'⏫ Uploaded By ➤ ᴛᴇᴀᴍ JB',
         original_caption,
         flags=re.IGNORECASE
         )
@@ -873,7 +873,7 @@ async def send_settings_message(chat_id, user_id):
         [Button.inline("🖼️ Set Thumbnail", b'setthumb'), Button.inline("🧲 Remove Thumbnail", b'remthumb')],
         [Button.inline("📤 Upload Method", b'uploadmethod'), Button.inline("⛔ Logout", b'logout')],
         [Button.inline("♻️ Reset All Settings ☢️", b'reset')],
-        [Button.url("💞 Contact Owner 🦋", "https://t.me/TEAM_A_S_BOT")]
+        [Button.url("💞 Contact Owner 🦋", "https://t.me/TeamJB_bot")]
     ]
     
     await gf.send_file(
@@ -944,7 +944,7 @@ async def callback_query_handler(event):
             [Button.inline(f"II_LevelUP_II v1 ⚡{pyrogram_check}", b'pyrogram')],
             [Button.inline(f"⚠️ Coming soon V2 {telethon_check}", b'telethon')]
         ]
-        await event.edit("Choose your preferred upload method:\n\n__**Note:** **ᴛᴇᴀᴍ ꫝຮ 亗 v2 ⚡**, built on Telethon(base), by @TEAM_A_S_BOT still in beta.__", buttons=buttons)
+        await event.edit("Choose your preferred upload method:\n\n__**Note:** **ᴛᴇᴀᴍ JB v2 ⚡**, built on Telethon(base), by @TeamJB_bot still in beta.__", buttons=buttons)
 
     elif event.data == b'pyrogram':
         save_user_upload_method(user_id, "Pyrogram")
@@ -952,7 +952,7 @@ async def callback_query_handler(event):
 
     elif event.data == b'telethon':
         save_user_upload_method(user_id, "Telethon")
-        await event.edit("Upload method set to **ᴛᴇᴀᴍ ꫝຮ 亗 V2 ⚡ \n\n Use V1 V2 is just Testing purpose**")        
+        await event.edit("Upload method set to **ᴛᴇᴀᴍ JB V2 ⚡ \n\n Use V1 V2 is just Testing purpose**")        
         
     elif event.data == b'reset':
         try:
@@ -1153,7 +1153,7 @@ async def handle_large_file(file, sender, edit, caption):
         if freecheck == 1:
             reply_markup = InlineKeyboardMarkup(
                 [
-                    [InlineKeyboardButton("💎 Get Premium to Forward", url="https://t.me/TEAM_A_S_BOT")]
+                    [InlineKeyboardButton("💎 Get Premium to Forward", url="https://t.me/TeamJB_bot")]
                 ]
             )
             await app.copy_message(
@@ -1252,7 +1252,7 @@ async def rename_file(file, sender, caption=None):
     base_name = os.path.basename(base_name)
 
     # Apply text transformations
-    base_name = re.sub(r'@\w+', '@TEAM_A_S_BOT', base_name)  # Replace mentions
+    base_name = re.sub(r'@\w+', '@teamjb1', base_name)  # Replace mentions
     for word in delete_words:
         base_name = base_name.replace(word, "")  # Remove banned words
     for word, replace_word in replacements.items():
@@ -1389,7 +1389,7 @@ def dl_progress_callback(done, total, user_id):
         f"│ **__Speed:__** {speed_mbps:.2f} Mbps\n"
         f"│ **__ETA:__** {remaining_time_min:.2f} min\n"
         f"╰──────────────────╯\n\n"
-        f"**__Pwrd By ᴛᴇᴀᴍ ꫝຮ 亗 __**"
+        f"**__Pwrd By ᴛᴇᴀᴍ JB__**"
     )
     
     # Update tracking variables for the user
