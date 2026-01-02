@@ -765,7 +765,7 @@ def format_caption(original_caption, sender, custom_caption):
     
     original_caption = re.sub(
         r'(⏫)?\s*<u>?\s*(Uploaded[\s_]*By)\s*[➤:>–\-]*\s*[^<\n]+</u>?',
-        r'⏫ Uploaded By ➤ Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss',
+        r'⏫ Uploaded By ➤ ᴛᴇᴀᴍ ꫝຮ 亗',
         original_caption,
         flags=re.IGNORECASE
         )
@@ -846,7 +846,7 @@ user_caption_preferences = {}
 async def set_rename_command(user_id, custom_rename_tag):
     user_rename_preferences[str(user_id)] = custom_rename_tag
 
-get_user_rename_preference = lambda user_id: user_rename_preferences.get(str(user_id), '⛥ @II_LevelUp_II')
+get_user_rename_preference = lambda user_id: user_rename_preferences.get(str(user_id), '⛥ @TEAM_A_S_BOT')
 
 async def set_caption_command(user_id, custom_caption):
     user_caption_preferences[str(user_id)] = custom_caption
@@ -944,7 +944,7 @@ async def callback_query_handler(event):
             [Button.inline(f"II_LevelUP_II v1 ⚡{pyrogram_check}", b'pyrogram')],
             [Button.inline(f"⚠️ Coming soon V2 {telethon_check}", b'telethon')]
         ]
-        await event.edit("Choose your preferred upload method:\n\n__**Note:** **II_LevelUP_II v2 ⚡**, built on Telethon(base), by @II_LevelUP_II still in beta.__", buttons=buttons)
+        await event.edit("Choose your preferred upload method:\n\n__**Note:** **ᴛᴇᴀᴍ ꫝຮ 亗 v2 ⚡**, built on Telethon(base), by @TEAM_A_S_BOT still in beta.__", buttons=buttons)
 
     elif event.data == b'pyrogram':
         save_user_upload_method(user_id, "Pyrogram")
@@ -952,7 +952,7 @@ async def callback_query_handler(event):
 
     elif event.data == b'telethon':
         save_user_upload_method(user_id, "Telethon")
-        await event.edit("Upload method set to **II_LevelUP_II V2 ⚡ \n\n Use V1 V2 is just Testing purpose**")        
+        await event.edit("Upload method set to **ᴛᴇᴀᴍ ꫝຮ 亗 V2 ⚡ \n\n Use V1 V2 is just Testing purpose**")        
         
     elif event.data == b'reset':
         try:
@@ -1153,7 +1153,7 @@ async def handle_large_file(file, sender, edit, caption):
         if freecheck == 1:
             reply_markup = InlineKeyboardMarkup(
                 [
-                    [InlineKeyboardButton("💎 Get Premium to Forward", url="https://t.me/GeniusJunctionX")]
+                    [InlineKeyboardButton("💎 Get Premium to Forward", url="https://t.me/TEAM_A_S_BOT")]
                 ]
             )
             await app.copy_message(
@@ -1318,7 +1318,7 @@ def progress_callback(done, total, user_id):
     # Format the final output as needed
     final = (
         f"╭──────────────────╮\n"
-        f"│     **__II_LevelUP_II ⚡ Uploader__**       \n"
+        f"│     **__ᴛᴇᴀᴍ ꫝຮ 亗 ⚡ Uploader__**       \n"
         f"├──────────\n"
         f"│ {progress_bar}\n\n"
         f"│ **__Progress:__** {percent:.2f}%\n"
@@ -1381,7 +1381,7 @@ def dl_progress_callback(done, total, user_id):
     # Format the final output as needed
     final = (
         f"╭──────────────────╮\n"
-        f"│     **__II_LevelUP_II ⚡ Downloader__**       \n"
+        f"│     **__ᴛᴇᴀᴍ ꫝຮ 亗 ⚡ Downloader__**       \n"
         f"├──────────\n"
         f"│ {progress_bar}\n\n"
         f"│ **__Progress:__** {percent:.2f}%\n"
@@ -1389,7 +1389,7 @@ def dl_progress_callback(done, total, user_id):
         f"│ **__Speed:__** {speed_mbps:.2f} Mbps\n"
         f"│ **__ETA:__** {remaining_time_min:.2f} min\n"
         f"╰──────────────────╯\n\n"
-        f"**__Pwrd by CHOSEN ONE ⚝__**"
+        f"**__Pwrd By ᴛᴇᴀᴍ ꫝຮ 亗 __**"
     )
     
     # Update tracking variables for the user
