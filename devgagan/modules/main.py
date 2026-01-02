@@ -277,7 +277,7 @@ async def batch_link(_, message):
                     msg = await app.send_message(message.chat.id, f"Processing...")
                     await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
                     await pin_msg.edit_text(
-                        f"Batch process started ⚡\nProcessing: {i - cs + 1}/{cl}\n\n**__Powered By ᴛᴇᴀᴍ  ꫝຮ 亗__**",
+                        f"Batch process started ⚡\nProcessing: {i - cs + 1}/{cl}\n\n**__Powered By ᴛᴇᴀᴍ  JB__**",
                         reply_markup=keyboard
                     )
 
