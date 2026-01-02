@@ -89,9 +89,9 @@ async def token_handler(client, message):
     user_id = message.chat.id
 
     if len(message.command) <= 1:
-        image_url = "https://freeimage.host/i/F5dGOsj"  # must end with .jpg/.png etc.
-        join_button = InlineKeyboardButton("✈️ Main Channel", url="https://t.me/+pZZQnMwRZR8yMTZl")
-        premium = InlineKeyboardButton("🦋 Contact Owner", url="https://t.me/TEAM_A_S_BOT")
+        image_url = "https://i.ibb.co/k2P1Zt9k/image.jpg"  # must end with .jpg/.png etc.
+        join_button = InlineKeyboardButton("✈️ Main Channel", url="https://t.me/teamjb1")
+        premium = InlineKeyboardButton("🦋 Contact Owner", url="https://t.me/TeamJB_bot")
         keyboard = InlineKeyboardMarkup([
             [join_button],
             [premium]
@@ -103,17 +103,23 @@ async def token_handler(client, message):
         await message.reply_photo(
             image_url,            
             caption=(
-                f"👋 **Hello, {user_mention}! Welcome to Save Restricted Bot!**\n\n"
-                "🔒 I Can Help You To **Save And Forward Content** from channels or groups that don't allow forwarding.🤫\n\n"
-                "📌 **How to use me:**\n"
-                "➤ Just **send me the post link** if it's Public\n"
-                "🔓 I'll send that post(s) to you.\n\n"
-                "> 💠 Use /batch For Bulk Forwarding...💀\n"
-                "🔐 **Private channel post?**\n\n"                
-                "➤ First do /login to save posts from Private Channel\n\n"
-                "💎 **Get Premium /plans**\n"
-                "💡 Need help? Send /guide\n For More Features Use /settings 😉 \n\n"
-                ">⚡ Contact Owner: @TEAM_A_S_BOT"
+                "🎌 *Welcome to Team JB Bot!* 👋\n\n"
+
+                "> 🌟 *I'm your ultimate content saver bot!*\n"
+                "> 📱 Save posts from channels/groups where forwarding is disabled\n"
+                "> 🎵 Download videos & audio from YouTube, Instagram & 30+ platforms\n"
+                "> ⚡ Batch processing with premium features\n"
+                "> 🔒 Secure & fast downloads\n\n"
+
+                "📋 *How to use:*\n\n"
+
+                "> • Send any public channel post link\n"
+                "> • For private channels: use /login\n"
+                "> • Get help: send /help\n"
+                "> • Get free token: send /token\n\n"
+
+                "🚀 *Ready to explore? Let's get started!*\n\n"
+                "💫 _Powered by Team JB_ 💫"
             ),
             reply_markup=keyboard,  # ✅ fixed here
             message_effect_id=5104841245755180586
