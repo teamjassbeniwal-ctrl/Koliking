@@ -1,8 +1,8 @@
 # ---------------------------------------------------
-# File Name: ytdl.py (Fixed version – uses your cookie files)
+# File Name: ytdl.py (Fully fixed – simplified yt-dlp options)
 # Description: Download videos/audio from YouTube & other sites
 # Author: Gagan
-# Version: 4.1.1 (Cookies file fix, zero‑byte check, cancellation)
+# Version: 4.2.0 (Stable format selection, cookies fix)
 # License: MIT
 # ---------------------------------------------------
 
@@ -110,18 +110,23 @@ def download_video(url, ydl_opts):
         ydl.download([url])
 
 async def fetch_video_info(url, ydl_opts, progress_message, check_duration_and_size):
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-        if check_duration_and_size:
-            dur = info.get('duration', 0)
-            if dur > 3 * 3600:
-                await progress_message.edit_text("**__Video >3h – aborted.__**")
-                return None
-            size = info.get('filesize_approx', 0)
-            if size > 2 * 1024 ** 3:
-                await progress_message.edit_text("**__Video >2GB – aborted.__**")
-                return None
-        return info
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception as e:
+        await progress_message.edit_text(f"**Info extraction failed:** `{e}`")
+        return None
+
+    if check_duration_and_size:
+        dur = info.get('duration', 0)
+        if dur > 3 * 3600:
+            await progress_message.edit_text("**__Video >3h – aborted.__**")
+            return None
+        size = info.get('filesize_approx', 0)
+        if size > 2 * 1024 ** 3:
+            await progress_message.edit_text("**__Video >2GB – aborted.__**")
+            return None
+    return info
 
 # Progress callback for upload
 user_progress = {}
@@ -252,6 +257,7 @@ async def process_audio(client: Client, message: Message, url: str, is_instagram
         random_filename = get_random_string()
         out_path = f"{random_filename}.mp3"
 
+        # Simplified yt-dlp options – no extractor_args, just basic format
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': f"{random_filename}.%(ext)s",
@@ -262,13 +268,8 @@ async def process_audio(client: Client, message: Message, url: str, is_instagram
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }],
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web']
-                }
-            },
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
         }
         if cookie_file:
@@ -444,19 +445,15 @@ async def process_video(client, message, url, is_instagram=False):
         out_name = get_random_string()
         download_path = f"{out_name}.%(ext)s"
 
+        # Simplified yt-dlp options – no extractor_args
         ydl_opts = {
             'outtmpl': download_path,
-            'format': 'bv*+ba/b',
+            'format': 'bestvideo+bestaudio/best',
             'writethumbnail': False,  # we handle thumbnail separately
             'quiet': True,
             'noplaylist': True,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web']
-                }
-            },
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
         }
         if cookie_file:
@@ -468,14 +465,8 @@ async def process_video(client, message, url, is_instagram=False):
 
         # Extract info (with size/duration check for YouTube)
         check_duration = not is_instagram  # only check duration for YouTube
-        try:
-            info = await fetch_video_info(url, ydl_opts, prog_msg, check_duration)
-        except Exception as e:
-            await prog_msg.edit_text(f"**Info extraction failed:** `{e}`")
-            return
-
+        info = await fetch_video_info(url, ydl_opts, prog_msg, check_duration)
         if not info:
-            await prog_msg.edit_text("**Failed to get video info.**")
             return
 
         # Download video
@@ -678,6 +669,3 @@ async def split_and_upload_file(client, chat_id, file_path, caption, user_id):
 
     await start_msg.delete()
     os.remove(file_path)
-
-
-
