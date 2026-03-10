@@ -228,7 +228,9 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     
     # ADD THIS LINE
     random_filename = get_random_string()
-
+    # For audio download, final path after postprocessing
+    out_path = os.path.join(DOWNLOAD_DIR, f"{out_name}.mp3")
+    
     ydl_opts = {
     'format': 'bestaudio/best',
     'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
@@ -261,7 +263,11 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
             return
 
         info = await extract_audio_async(ydl_opts, url)
-
+        out_path = os.path.join(DOWNLOAD_DIR, f"{random_filename}.mp3")
+        if not os.path.exists(out_path):
+            await message.reply_text("**__Audio file missing!__**")
+            return
+            
         if await check_cancelled(uid):
             await prog_msg.edit_text("**__Cancelled.__**")
             if os.path.exists(out_path):
