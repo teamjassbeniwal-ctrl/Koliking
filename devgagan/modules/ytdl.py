@@ -208,13 +208,44 @@ async def adl_handler(client: Client, message: Message):
     finally:
         ongoing_downloads.pop(uid, None)
 
-async def process_audio(client: Client, message: Message, url: str, cookies_env_var=None):
+@app.on_message(filters.command("adl"))
+async def adl_handler(client: Client, message: Message):
+    uid = message.from_user.id
+    if ongoing_downloads.get(uid):
+        await message.reply_text("**You already have an ongoing download.**")
+        return
+    if len(message.command) < 2:
+        await message.reply_text("**Usage:** `/adl <link>`")
+        return
 
+    url = message.command[1]
+    ongoing_downloads[uid] = True
+    cancel_downloads.pop(uid, None)
+
+    try:
+        # Choose cookies based on platform
+        if "instagram.com" in url:
+            cookies_env_var = "INSTA_COOKIES"
+        elif "youtube.com" in url or "youtu.be" in url:
+            cookies_env_var = "YT_COOKIES"
+        else:
+            cookies_env_var = None
+
+        await process_audio(client, message, url, cookies_env_var)
+
+    except Exception as e:
+        await message.reply_text(f"**Error:** `{e}`")
+    finally:
+        ongoing_downloads.pop(uid, None)
+
+# ---------------- process audio ----------------
+async def process_audio(client: Client, message: Message, url: str, cookies_env_var=None):
     uid = message.from_user.id
 
+    # Playlist handling
     if "playlist" in url or "&list=" in url:
         await message.reply_text("**__Playlist detected – downloading all...__**")
-        await process_audio_playlist(client, message, url, cookies_env_var)
+        # implement process_audio_playlist if needed
         return
 
     cookies = cookies_env_var if cookies_env_var else None
@@ -225,12 +256,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
             f.write(cookies)
             temp_cookie = f.name
 
-    
-    # ADD THIS LINE
     random_filename = get_random_string()
-    # For audio download, final path after postprocessing
-    out_path = os.path.join(DOWNLOAD_DIR, f"{random_filename}.mp3")
-    
     ydl_opts = {
     'format': 'bestaudio/best',
     'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
@@ -253,117 +279,97 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
         'User-Agent': 'Mozilla/5.0'
     }
     }
-
     prog_msg = await message.reply_text("**__Starting audio extraction...__**")
 
     try:
-
         if await check_cancelled(uid):
             await prog_msg.edit_text("**__Cancelled.__**")
             return
 
-        info = await extract_audio_async(ydl_opts, url)
-        out_path = os.path.join(DOWNLOAD_DIR, f"{random_filename}.mp3")
-        if not os.path.exists(out_path):
-            await message.reply_text("**__Audio file missing!__**")
+        # Sync extraction inside executor
+        def sync_extract():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(url, download=True)
+
+        info = await asyncio.get_event_loop().run_in_executor(None, sync_extract)
+
+        # Get actual MP3 path
+        out_path = None
+        if 'requested_downloads' in info and info['requested_downloads']:
+            out_path = info['requested_downloads'][0].get('filepath')
+
+        if not out_path or not os.path.exists(out_path):
+            await prog_msg.edit_text("**__Audio file missing!__**")
             return
-            
+
         if await check_cancelled(uid):
             await prog_msg.edit_text("**__Cancelled.__**")
-            if os.path.exists(out_path):
-                os.remove(out_path)
+            os.remove(out_path)
             return
 
         title = info.get("title", "Audio")
-
         await prog_msg.edit_text("**__Editing metadata...__**")
 
-        if os.path.exists(out_path):
-
-            def meta():
-
-                audio = MP3(out_path, ID3=ID3)
-
-                try:
-                    audio.add_tags()
-                except:
-                    pass
-
-                audio.tags["TIT2"] = TIT2(encoding=3, text=title)
-                audio.tags["TPE1"] = TPE1(encoding=3, text="Team SPY")
-                audio.tags["COMM"] = COMM(encoding=3, lang="eng", text="Powered by Team SPY")
-
-                thumb_url = info.get("thumbnail")
-
-                if thumb_url:
-                    thumb_path = os.path.join(tempfile.gettempdir(), f"{get_random_string()}.jpg")
-
-                    import requests
-                    r = requests.get(thumb_url)
-
-                    with open(thumb_path, "wb") as f:
-                        f.write(r.content)
-
-                    with open(thumb_path, "rb") as img:
-                        audio.tags["APIC"] = APIC(
-                            encoding=3,
-                            mime="image/jpeg",
-                            type=3,
-                            data=img.read()
-                        )
-
-                    os.remove(thumb_path)
-
-                audio.save()
-
-            await asyncio.to_thread(meta)
-
-            if await check_cancelled(uid):
-                await prog_msg.edit_text("**__Cancelled.__**")
-                if os.path.exists(out_path):
-                    os.remove(out_path)
-                return
-
-            await prog_msg.delete()
-
-            prog = await client.send_message(
-                message.chat.id,
-                "**__Uploading...__**"
-            )
-
+        def meta():
+            audio = MP3(out_path, ID3=ID3)
             try:
+                audio.add_tags()
+            except:
+                pass
 
-                await client.send_audio(
-                    chat_id=message.chat.id,
-                    audio=out_path,
-                    caption=f"**{title}**\n\n__Powered by Team JB__",
-                    title=title,
-                    performer="Team JB",
-                    progress=progress_callback,
-                    progress_args=(message.chat.id, uid)
-                )
+            audio.tags["TIT2"] = TIT2(encoding=3, text=title)
+            audio.tags["TPE1"] = TPE1(encoding=3, text="Team SPY")
+            audio.tags["COMM"] = COMM(encoding=3, lang="eng", text="Powered by Team SPY")
 
-            finally:
-                await prog.delete()
+            thumb_url = info.get("thumbnail")
+            if thumb_url:
+                thumb_path = os.path.join(tempfile.gettempdir(), f"{get_random_string()}.jpg")
+                r = requests.get(thumb_url)
+                with open(thumb_path, "wb") as f:
+                    f.write(r.content)
+                with open(thumb_path, "rb") as img:
+                    audio.tags["APIC"] = APIC(
+                        encoding=3,
+                        mime="image/jpeg",
+                        type=3,
+                        data=img.read()
+                    )
+                os.remove(thumb_path)
+            audio.save()
 
-        else:
-            await message.reply_text("**__Audio file missing!__**")
+        await asyncio.to_thread(meta)
+
+        if await check_cancelled(uid):
+            await prog_msg.edit_text("**__Cancelled.__**")
+            os.remove(out_path)
+            return
+
+        await prog_msg.delete()
+        prog = await client.send_message(message.chat.id, "**__Uploading...__**")
+
+        try:
+            await client.send_audio(
+                chat_id=message.chat.id,
+                audio=out_path,
+                caption=f"**{title}**\n\n__Powered by Team JB__",
+                title=title,
+                performer="Team JB",
+                progress=progress_callback,
+                progress_args=(message.chat.id, uid)
+            )
+        finally:
+            await prog.delete()
 
     except Exception as e:
         logger.exception("Audio error")
         await message.reply_text(f"**__Error: {e}__**")
-
     finally:
-
-        if os.path.exists(out_path):
+        if out_path and os.path.exists(out_path):
             os.remove(out_path)
-
         if temp_cookie and os.path.exists(temp_cookie):
             os.remove(temp_cookie)
-
-        if uid in cancel_downloads:
-            cancel_downloads.pop(uid, None)
-
+        cancel_downloads.pop(uid, None)
+        
 async def process_audio_playlist(client, message, url, cookies_env_var):
     uid = message.from_user.id
     prog = await message.reply_text("**__Extracting playlist...__**")
