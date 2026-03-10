@@ -229,7 +229,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     # ADD THIS LINE
     random_filename = get_random_string()
     # For audio download, final path after postprocessing
-    out_path = os.path.join(DOWNLOAD_DIR, f"{out_name}.mp3")
+    out_path = os.path.join(DOWNLOAD_DIR, f"{random_filename}.mp3")
     
     ydl_opts = {
     'format': 'bestaudio/best',
