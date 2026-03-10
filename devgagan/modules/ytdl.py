@@ -2,7 +2,7 @@
 # File Name: ytdl.py (Pyrogram-only, self-contained)
 # Description: Download videos/audio from YouTube & other sites
 # Author: Gagan
-# Version: 4.0.1
+# Version: 4.0.2
 # License: MIT
 # ---------------------------------------------------
 
@@ -386,9 +386,11 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     out_path = os.path.abspath(out_name)
     thumb_file = None
 
+    # 🔧 FIXED format string – more compatible
     ydl_opts = {
         'outtmpl': out_path,
-        'format': 'bv*+ba/b',
+        'format': 'best[ext=mp4]/best',          # Prefer mp4, fallback to best
+        'merge_output_format': 'mp4',            # Ensure final file is mp4
         'cookiefile': '/app/cookies/youtube.txt',
         'writethumbnail': True,
         'verbose': True,
