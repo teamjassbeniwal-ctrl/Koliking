@@ -228,11 +228,10 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     
     # ADD THIS LINE
     random_filename = get_random_string()
-    'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
-    
+
     ydl_opts = {
     'format': 'bestaudio/best',
-    'outtmpl': f"{random_filename}.%(ext)s",
+    'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
     'cookiefile': '/app/cookies/youtube.txt',
     'quiet': False,
     'noplaylist': True,
