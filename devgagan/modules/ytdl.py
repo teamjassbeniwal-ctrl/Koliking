@@ -21,6 +21,9 @@ import json
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from devgagan import app
+from devgagan.core.func import chk_user
+from devgagan.modules.shrink import is_user_verified
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 import aiohttp
 import aiofiles
@@ -37,9 +40,33 @@ thread_pool = ThreadPoolExecutor()
 ongoing_downloads = {}
 cancel_downloads = {}  # Track cancellation requests
 
+interval_set = {}
+users_loop = {} where add
+
 # -------------------------------------------------------------------
 #  Self‑contained helper functions
 # -------------------------------------------------------------------
+# Check if user can proceed
+async def check_interval(user_id, freecheck):
+    if freecheck != 1 or await is_user_verified(user_id):  # Premium or verified users
+        return True, None
+
+    now = datetime.now()
+
+    if user_id in interval_set:
+        cooldown_end = interval_set[user_id]
+        if now < cooldown_end:
+            remaining = (cooldown_end - now).seconds
+            return False, f"⏳ Please wait {remaining} seconds before sending another link.\n\nUpgrade to premium for instant downloads."
+        else:
+            del interval_set[user_id]
+
+    return True, None
+
+# Set cooldown for a user
+async def set_interval(user_id, minutes=15):
+    interval_set[user_id] = datetime.now() + timedelta(minutes=minutes)
+    
 def get_random_string(length=7):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
@@ -185,28 +212,51 @@ async def cancel_handler(client: Client, message: Message):
 # -------------------------------------------------------------------
 @app.on_message(filters.command("adl"))
 async def adl_handler(client: Client, message: Message):
+
     uid = message.from_user.id
-    if ongoing_downloads.get(uid):
-        await message.reply_text("**You already have an ongoing download.**")
+
+    if users_loop.get(uid):
+        await message.reply_text("⚠ You already have a running download.")
         return
+
     if len(message.command) < 2:
-        await message.reply_text("**Usage:** `/adl <link>`")
+        await message.reply_text("Usage: /adl <link>")
         return
+
+    freecheck = await chk_user(message, uid)
+
+    can, msg = await check_interval(uid, freecheck)
+
+    if not can:
+        await message.reply_text(msg)
+        return
+
     url = message.command[1]
-    ongoing_downloads[uid] = True
-    if uid in cancel_downloads:
-        del cancel_downloads[uid]
+
+    if ("playlist" in url or "&list=" in url) and freecheck == 1:
+        await message.reply_text(
+            "❌ Playlist download is only available for Premium users."
+        )
+        return
+
+    users_loop[uid] = True
+
     try:
+
         if "instagram.com" in url:
             await process_audio(client, message, url, "INSTA_COOKIES")
+
         elif "youtube.com" in url or "youtu.be" in url:
             await process_audio(client, message, url, "YT_COOKIES")
+
         else:
             await process_audio(client, message, url)
-    except Exception as e:
-        await message.reply_text(f"**Error:** `{e}`")
+
+        if freecheck == 1:
+            await set_interval(uid, 15)
+
     finally:
-        ongoing_downloads.pop(uid, None)
+        users_loop.pop(uid, None)
 
 @app.on_message(filters.command("adl"))
 async def adl_handler(client: Client, message: Message):
@@ -404,32 +454,53 @@ async def process_audio_playlist(client, message, url, cookies_env_var):
 # -------------------------------------------------------------------
 @app.on_message(filters.command("dl"))
 async def dl_handler(client: Client, message: Message):
+
     uid = message.from_user.id
-    if ongoing_downloads.get(uid):
-        await message.reply_text("**You already have an ongoing download.**")
+
+    if users_loop.get(uid):
+        await message.reply_text("⚠ You already have a running download.")
         return
+
     if len(message.command) < 2:
-        await message.reply_text("**Usage:** `/dl <link>`")
+        await message.reply_text("Usage: /dl <link>")
         return
+
+    freecheck = await chk_user(message, uid)
+
+    can, msg = await check_interval(uid, freecheck)
+
+    if not can:
+        await message.reply_text(msg)
+        return
+
     url = message.command[1]
-    if "playlist" in url or "&list=" in url:
-        await message.reply_text("**__Playlist detected – downloading all...__**")
-        await process_video_playlist(client, message, url, None)
+
+    # Playlist restriction
+    if ("playlist" in url or "&list=" in url) and freecheck == 1:
+        await message.reply_text(
+            "❌ Playlist download is only available for Premium users."
+        )
         return
-    ongoing_downloads[uid] = True
-    if uid in cancel_downloads:
-        del cancel_downloads[uid]
+
+    users_loop[uid] = True
+
     try:
+
         if "instagram.com" in url:
             await process_video(client, message, url, "INSTA_COOKIES", False)
+
         elif "youtube.com" in url or "youtu.be" in url:
             await process_video(client, message, url, "YT_COOKIES", True)
+
         else:
             await process_video(client, message, url, None, False)
-    except Exception as e:
-        await message.reply_text(f"**Error:** `{e}`")
+
+        # Set cooldown for free users
+        if freecheck == 1:
+            await set_interval(uid, 15)
+
     finally:
-        ongoing_downloads.pop(uid, None)
+        users_loop.pop(uid, None)
 
 async def process_video(client, message, url, cookies_env_var, check_duration):
     uid = message.from_user.id
