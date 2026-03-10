@@ -22,7 +22,7 @@ import string
 import requests
 import logging
 import math
-from devgagan import client, app
+from shared_client import client, app   # ✅ uses the new shared module
 from telethon import events
 from telethon.sync import TelegramClient
 from telethon.tl.types import DocumentAttributeVideo
