@@ -41,7 +41,7 @@ ongoing_downloads = {}
 cancel_downloads = {}  # Track cancellation requests
 
 interval_set = {}
-users_loop = {} where add
+users_loop = {}
 
 # -------------------------------------------------------------------
 #  Self‑contained helper functions
