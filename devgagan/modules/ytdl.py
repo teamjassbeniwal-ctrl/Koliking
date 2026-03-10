@@ -22,10 +22,8 @@ import requests
 import logging
 import math
 from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.enums import ParseMode
-from pyrogram.errors import FloodWait
-from devgagan import app  # Pyrogram client
+from pyrogram.types import Message
+from devgagan import app
 from devgagan.utils.func import get_video_metadata, screenshot
 from devgagantools import fast_upload
 from concurrent.futures import ThreadPoolExecutor
@@ -194,23 +192,23 @@ async def adl_handler(client: Client, message: Message):
 
     try:
         if "instagram.com" in url:
-            await process_audio(message, url, cookies_env_var="INSTA_COOKIES")
+            await process_audio(client, message, url, cookies_env_var="INSTA_COOKIES")
         elif "youtube.com" in url or "youtu.be" in url:
-            await process_audio(message, url, cookies_env_var="YT_COOKIES")
+            await process_audio(client, message, url, cookies_env_var="YT_COOKIES")
         else:
-            await process_audio(message, url)
+            await process_audio(client, message, url)
     except Exception as e:
         await message.reply_text(f"**An error occurred:** `{e}`")
     finally:
         ongoing_downloads.pop(user_id, None)
 
-async def process_audio(message: Message, url: str, cookies_env_var=None):
+async def process_audio(client: Client, message: Message, url: str, cookies_env_var=None):
     user_id = message.from_user.id
 
     # Check if playlist
     if "playlist" in url or "&list=" in url:
         await message.reply_text("**__Playlist detected! Downloading all audio tracks...__**")
-        await process_audio_playlist(message, url, cookies_env_var)
+        await process_audio_playlist(client, message, url, cookies_env_var)
         return
 
     cookies = None
@@ -344,7 +342,7 @@ async def process_audio(message: Message, url: str, cookies_env_var=None):
         if user_id in cancel_downloads:
             cancel_downloads.pop(user_id, None)
 
-async def process_audio_playlist(message: Message, url: str, cookies_env_var=None):
+async def process_audio_playlist(client: Client, message: Message, url: str, cookies_env_var=None):
     user_id = message.from_user.id
     progress_msg = await message.reply_text("**__Extracting playlist information...__**")
 
@@ -381,7 +379,7 @@ async def process_audio_playlist(message: Message, url: str, cookies_env_var=Non
 
                 video_url = f"https://youtube.com/watch?v={entry['id']}"
                 try:
-                    await process_audio(message, video_url, cookies_env_var)
+                    await process_audio(client, message, video_url, cookies_env_var)
                     downloaded += 1
                     await progress_msg.edit_text(
                         f"**__Progress: {downloaded}/{total_videos} downloaded__**\n"
@@ -398,7 +396,7 @@ async def process_audio_playlist(message: Message, url: str, cookies_env_var=Non
             )
         else:
             await message.reply_text("**__No playlist found. Processing as single video...__**")
-            await process_audio(message, url, cookies_env_var)
+            await process_audio(client, message, url, cookies_env_var)
 
     except Exception as e:
         await message.reply_text(f"**__Error processing playlist: {e}__**")
@@ -420,7 +418,7 @@ async def dl_handler(client: Client, message: Message):
     # Check if playlist
     if "playlist" in url or "&list=" in url:
         await message.reply_text("**__Playlist detected! Downloading all videos...__**")
-        await process_video_playlist(message, url, None)
+        await process_video_playlist(client, message, url, None)
         return
 
     ongoing_downloads[user_id] = True
@@ -429,18 +427,18 @@ async def dl_handler(client: Client, message: Message):
 
     try:
         if "instagram.com" in url:
-            await process_video(message, url, "INSTA_COOKIES", check_duration_and_size=False)
+            await process_video(client, message, url, "INSTA_COOKIES", check_duration_and_size=False)
         elif "youtube.com" in url or "youtu.be" in url:
-            await process_video(message, url, "YT_COOKIES", check_duration_and_size=True)
+            await process_video(client, message, url, "YT_COOKIES", check_duration_and_size=True)
         else:
-            await process_video(message, url, None, check_duration_and_size=False)
+            await process_video(client, message, url, None, check_duration_and_size=False)
 
     except Exception as e:
         await message.reply_text(f"**An error occurred:** `{e}`")
     finally:
         ongoing_downloads.pop(user_id, None)
 
-async def process_video(message: Message, url: str, cookies_env_var, check_duration_and_size=False):
+async def process_video(client: Client, message: Message, url: str, cookies_env_var, check_duration_and_size=False):
     user_id = message.from_user.id
     logger.info(f"Received link: {url}")
 
@@ -540,7 +538,7 @@ async def process_video(message: Message, url: str, cookies_env_var, check_durat
             await progress_message.delete()
             prog = await client.send_message(chat_id, "**__Starting Upload...__**")
 
-                        try:
+            try:
                 uploaded = await fast_upload(
                     client, download_path,
                     reply=prog,
@@ -601,11 +599,10 @@ async def process_video(message: Message, url: str, cookies_env_var, check_durat
         if user_id in cancel_downloads:
             cancel_downloads.pop(user_id, None)
 
-
 # -------------------------------------------------------------------
 # Playlist processing for videos
 # -------------------------------------------------------------------
-async def process_video_playlist(message: Message, url: str, cookies_env_var):
+async def process_video_playlist(client: Client, message: Message, url: str, cookies_env_var):
     user_id = message.from_user.id
     progress_msg = await message.reply_text("**__Extracting playlist information...__**")
 
@@ -643,7 +640,7 @@ async def process_video_playlist(message: Message, url: str, cookies_env_var):
 
                 video_url = f"https://youtube.com/watch?v={entry['id']}"
                 try:
-                    await process_video(message, video_url, cookies_env_var, check_duration_and_size=True)
+                    await process_video(client, message, video_url, cookies_env_var, check_duration_and_size=True)
                     downloaded += 1
                     await progress_msg.edit_text(
                         f"**__Progress: {downloaded}/{total_videos} downloaded__**\n"
@@ -660,7 +657,7 @@ async def process_video_playlist(message: Message, url: str, cookies_env_var):
             )
         else:
             await message.reply_text("**__No playlist found. Processing as single video...__**")
-            await process_video(message, url, cookies_env_var, check_duration_and_size=True)
+            await process_video(client, message, url, cookies_env_var, check_duration_and_size=True)
 
     except Exception as e:
         await message.reply_text(f"**__Error processing playlist: {e}__**")
@@ -764,7 +761,6 @@ async def split_and_upload_file(client: Client, chat_id, file_path, caption, use
     await start.delete()
     os.remove(file_path)
 
-
 # -------------------------------------------------------------------
 # Progress bar helper for split uploads
 # -------------------------------------------------------------------
@@ -838,4 +834,3 @@ def time_formatter(milliseconds):
         parts.append(f"{milliseconds}ms")
 
     return ' '.join(parts) if parts else "0s"
-            
