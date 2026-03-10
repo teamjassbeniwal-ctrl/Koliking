@@ -223,20 +223,20 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     fname = f"@team_spy_pro_{uid}"
     out_path = f"{fname}.mp3"
 
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': f"{fname}.%(ext)s",
-        'cookiefile': '/app/cookies/youtube.txt',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192'
-        }],
-        'quiet': False,
-        'noplaylist': True,
-        'js_runtimes': {'node': {}},
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
-        'http_headers': {'User-Agent': 'Mozilla/5.0'}
+    audio_opts = {
+    'format': 'bestaudio/best',
+    'outtmpl': f"{fname}.%(ext)s",
+    'cookiefile': '/app/cookies/youtube.txt',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192'
+    }],
+    'quiet': False,
+    'noplaylist': True,
+    'js_runtimes': {'node': {}},
+    'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+    'http_headers': {'User-Agent': 'Mozilla/5.0'}
     }
 
     prog_msg = await message.reply_text("**__Starting audio extraction...__**")
@@ -387,20 +387,21 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
 
     # Improved yt-dlp options for YouTube
     ydl_opts = {
-        'outtmpl': out_path + '.%(ext)s',   # let yt-dlp add extension
-        'format': 'bv*+ba/b'                    # best format, any container
-        'cookiefile': '/app/cookies/youtube.txt',
-        'writethumbnail': True,
-        'verbose': True,
-        'noplaylist': True,
-        'ignoreerrors': True,                # skip unavailable formats
-        'retries': 10,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['web']      # use only web client (better with cookies)
-            }
-        },
-        'http_headers': {'User-Agent': 'Mozilla/5.0'}
+    'outtmpl': out_path + '.%(ext)s',
+    'format': 'bv*+ba/b',
+    'cookiefile': '/app/cookies/youtube.txt',
+    'writethumbnail': True,
+    'verbose': True,
+    'noplaylist': True,
+    'ignoreerrors': True,
+    'retries': 10,
+    'js_runtimes': {'node': {}},
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web']
+        }
+    },
+    'http_headers': {'User-Agent': 'Mozilla/5.0'}
     }
 
     prog_msg = await message.reply_text("**__Starting download...__**")
