@@ -226,16 +226,17 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     out_path = f"{fname}.mp3"
 
     ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": f"{fname}.%(ext)s",
-        "cookiefile": "/app/cookies/youtube.txt",
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192"
-        }],
-        "noplaylist": True,
-        "http_headers": {"User-Agent": "Mozilla/5.0"}
+    "format": "bestaudio/best",
+    "outtmpl": f"{fname}.%(ext)s",
+    "cookiefile": "/app/cookies/youtube.txt",
+    "noplaylist": True,
+    "retries": 10,
+    "quiet": True,
+    "nocheckcertificate": True,
+    "ignoreerrors": False,
+    "http_headers": {
+        "User-Agent": "Mozilla/5.0"
+    }
     }
 
     prog_msg = await message.reply_text("**__Starting audio extraction...__**")
@@ -423,14 +424,17 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
 
     # yt-dlp options
     ydl_opts = {
-        "format": "bv*+ba/b",
-        "outtmpl": out_path + ".%(ext)s",
-        "cookiefile": "/app/cookies/youtube.txt",
-        "noplaylist": True,
-        "ignoreerrors": True,
-        "retries": 10,
-        "quiet": True,
-        "http_headers": {"User-Agent": "Mozilla/5.0"}
+    "format": "bestvideo+bestaudio/best",
+    "merge_output_format": "mp4",
+    "outtmpl": f"{out_name}.%(ext)s",
+    "cookiefile": "/app/cookies/youtube.txt",
+    "noplaylist": True,
+    "retries": 10,
+    "quiet": True,
+    "nocheckcertificate": True,
+    "http_headers": {
+        "User-Agent": "Mozilla/5.0"
+    }
     }
 
     prog_msg = await message.reply_text("**Starting download...**")
