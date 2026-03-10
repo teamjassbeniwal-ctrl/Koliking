@@ -214,24 +214,28 @@ async def process_audio(client: Client, message: Message, url: str, is_instagram
 
         # RESTORED extractor_args with multiple clients
         ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': f"{random_filename}.%(ext)s",
-            'quiet': True,
-            'noplaylist': True,
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web', 'ios']  # multiple clients
-                }
-            },
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
+    'format': 'bestaudio/best',
+    'outtmpl': f"{random_filename}.%(ext)s",
+    'cookiefile': '/app/cookies/youtube.txt',
+    'quiet': False,
+    'noplaylist': True,
+    'js_runtimes': {'node': {}},
+    'remote_components': ['ejs:github'],
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web']
         }
+    },
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0'
+    }
+        }
+        
         if cookie_file:
             ydl_opts['cookiefile'] = cookie_file
 
@@ -400,19 +404,22 @@ async def process_video(client, message, url, is_instagram=False):
 
         # RESTORED extractor_args and format
         ydl_opts = {
-            'outtmpl': download_path,
-            'format': 'bestvideo+bestaudio/best',
-            'writethumbnail': False,
-            'quiet': True,
-            'noplaylist': True,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web', 'ios']
-                }
-            },
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
+    'outtmpl': download_path,
+    'format': 'bv*+ba/b',
+    'cookiefile': '/app/cookies/youtube.txt',
+    'writethumbnail': True,
+    'verbose': True,
+    'noplaylist': True,
+    'js_runtimes': {'node': {}},
+    'remote_components': ['ejs:github'],
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web']
+        }
+    },
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0'
+    }
         }
         if cookie_file:
             ydl_opts['cookiefile'] = cookie_file
