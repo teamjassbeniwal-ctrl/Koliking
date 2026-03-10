@@ -524,36 +524,50 @@ async def process_video_playlist(client, message, url):
     ongoing_downloads[uid] = True
     cancel_downloads.pop(uid, None)
     prog = await message.reply_text("**__Extracting playlist...__**")
+    
     try:
         ydl_opts = {'quiet': True, 'extract_flat': True}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-        if 'entries' not in info:
+
+        # if playlist entries missing, fallback to single video
+        if 'entries' not in info or not info['entries']:
             await prog.edit_text("**__No playlist found.__**")
             await process_video(client, message, url)
             return
+
         total = len(info['entries'])
-        await prog.edit_text(f"**__Playlist: {info.get('title','')}__**\n**Total: {total}**")
+        await prog.edit_text(f"**__Playlist: {info.get('title','')}__**\n**Total videos: {total}**")
+        
         good = fail = 0
+
         for entry in info['entries']:
             if await check_cancelled(uid):
                 await message.reply_text(f"**__Cancelled. Downloaded: {good}/{total}__**")
                 return
+
             vid_url = f"https://youtube.com/watch?v={entry['id']}"
             try:
+                # ensure each video gets its own unique filename
                 await process_video(client, message, vid_url)
                 good += 1
+                await asyncio.sleep(1)  # short pause to avoid blocks
             except Exception as e:
                 fail += 1
                 logger.error(f"Failed {vid_url}: {e}")
+
+            # update progress after each video
             await prog.edit_text(f"**__Progress: {good}/{total} downloaded, {fail} failed.__**")
+
         await message.reply_text(f"**__Playlist done! Success: {good}, Failed: {fail}__**")
+
     except Exception as e:
         await message.reply_text(f"**__Error: {e}__**")
+
     finally:
         ongoing_downloads.pop(uid, None)
         cancel_downloads.pop(uid, None)
-
+        
 # -------------------------------------------------------------------
 #  Split & upload large files (>2GB)
 # -------------------------------------------------------------------
