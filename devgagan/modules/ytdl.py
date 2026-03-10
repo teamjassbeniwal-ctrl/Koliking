@@ -231,11 +231,6 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     'format': 'bestaudio/best',
     'outtmpl': f"{random_filename}.%(ext)s",
     'cookiefile': '/app/cookies/youtube.txt',
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192'
-    }],
     'quiet': False,
     'noplaylist': True,
     'js_runtimes': {'node': {}},
