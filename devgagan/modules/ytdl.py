@@ -30,6 +30,9 @@ from mutagen.mp3 import MP3
 
 logger = logging.getLogger(__name__)
 
+DOWNLOAD_DIR = "/app/downloads"
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
 thread_pool = ThreadPoolExecutor()
 ongoing_downloads = {}
 cancel_downloads = {}  # Track cancellation requests
@@ -225,7 +228,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     
     # ADD THIS LINE
     random_filename = get_random_string()
-    out_path = f"{random_filename}.mp3"
+    'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
     
     ydl_opts = {
     'format': 'bestaudio/best',
@@ -417,9 +420,7 @@ async def dl_handler(client: Client, message: Message):
     finally:
         ongoing_downloads.pop(uid, None)
 
-
 async def process_video(client, message, url, cookies_env_var, check_duration):
-
     uid = message.from_user.id
     cookies = cookies_env_var if cookies_env_var else None
     temp_cookie = None
@@ -431,34 +432,27 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
             temp_cookie = f.name
 
     out_name = get_random_string()
-    out_path = os.path.abspath(out_name)
-    
-    # ADD THIS LINE
-    download_path = f"{out_name}.%(ext)s"
+    download_path = os.path.join(DOWNLOAD_DIR, f"{out_name}.%(ext)s")
+
     # yt-dlp options
     ydl_opts = {
-    'outtmpl': download_path,
-    'format': 'bv*+ba/b',
-    'cookiefile': '/app/cookies/youtube.txt',
-    'writethumbnail': True,
-    'verbose': True,
-    'noplaylist': True,
-    'js_runtimes': {'node': {}},
-    'remote_components': ['ejs:github'],
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'web']
-        }
-    },
-    'http_headers': {
-        'User-Agent': 'Mozilla/5.0'
-    }
+        'outtmpl': download_path,
+        'format': 'bv*+ba/b',
+        'cookiefile': '/app/cookies/youtube.txt',
+        'writethumbnail': True,
+        'verbose': True,
+        'noplaylist': True,
+        'js_runtimes': {'node': {}},
+        'remote_components': ['ejs:github'],
+        'extractor_args': {
+            'youtube': {'player_client': ['android', 'web']}
+        },
+        'http_headers': {'User-Agent': 'Mozilla/5.0'}
     }
 
     prog_msg = await message.reply_text("**Starting download...**")
 
     try:
-
         if await check_cancelled(uid):
             await prog_msg.edit_text("**Cancelled.**")
             return
@@ -479,9 +473,9 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
 
         # Find downloaded file
         downloaded_file = None
-        for f in os.listdir("."):
-            if f.startswith(out_name):
-                downloaded_file = os.path.abspath(f)
+        for f in os.listdir(DOWNLOAD_DIR):
+            if f.startswith(out_name) and not f.endswith(".part"):
+                downloaded_file = os.path.join(DOWNLOAD_DIR, f)
                 break
 
         if not downloaded_file or not os.path.exists(downloaded_file):
@@ -490,41 +484,30 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
 
         # Convert to MP4 if needed
         if not downloaded_file.endswith(".mp4"):
-
             mp4_path = os.path.abspath(out_name + ".mp4")
-
             try:
                 subprocess.run(
                     ["ffmpeg", "-i", downloaded_file, "-c", "copy", mp4_path, "-y"],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
                 )
-
                 os.remove(downloaded_file)
                 downloaded_file = mp4_path
-
             except Exception as e:
                 logger.warning(f"MP4 conversion failed: {e}")
 
         # Metadata
         title = info.get("title", "Video")
         meta = get_video_metadata(downloaded_file) or {}
-
         width = meta.get("width") or 1280
         height = meta.get("height") or 720
         duration = int(meta.get("duration") or 0)
 
         # Thumbnail
         thumb_url = info.get("thumbnail")
-
         if thumb_url:
-            thumb_path = os.path.join(
-                tempfile.gettempdir(),
-                get_random_string() + ".jpg"
-            )
-
+            thumb_path = os.path.join(tempfile.gettempdir(), get_random_string() + ".jpg")
             dl = d_thumbnail(thumb_url, thumb_path)
-
             if dl and os.path.exists(dl):
                 thumb = dl
 
@@ -539,27 +522,13 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
 
         # Large file splitting
         if os.path.getsize(downloaded_file) > 2 * 1024 ** 3:
-
             prog = await client.send_message(chat, "**Large file – splitting...**")
-
-            await split_and_upload_file(
-                client,
-                chat,
-                downloaded_file,
-                caption,
-                uid
-            )
-
+            await split_and_upload_file(client, chat, downloaded_file, caption, uid)
             await prog.delete()
-
         else:
-
             await prog_msg.delete()
-
             prog = await client.send_message(chat, "**Uploading...**")
-
             try:
-
                 await client.send_video(
                     chat_id=chat,
                     video=downloaded_file,
@@ -572,31 +541,38 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
                     progress=progress_callback,
                     progress_args=(chat, uid)
                 )
-
             finally:
                 await prog.delete()
 
     except Exception as e:
-
         logger.exception("Video error")
         await message.reply_text(f"**Error:** `{e}`")
 
     finally:
-
-        # Cleanup
-        for f in os.listdir("."):
+        # Cleanup downloaded files
+        for f in os.listdir(DOWNLOAD_DIR):
             if f.startswith(out_name):
+                file_path = os.path.join(DOWNLOAD_DIR, f)
                 try:
-                    os.remove(os.path.join(".", f))
-                except:
-                    pass
+                    os.remove(file_path)
+                except Exception as e:
+                    logger.warning(f"Failed to remove {file_path}: {e}")
 
+        # Cleanup temporary cookie file
         if temp_cookie and os.path.exists(temp_cookie):
-            os.remove(temp_cookie)
+            try:
+                os.remove(temp_cookie)
+            except Exception as e:
+                logger.warning(f"Failed to remove temp cookie {temp_cookie}: {e}")
 
+        # Cleanup thumbnail
         if thumb and os.path.exists(thumb):
-            os.remove(thumb)
+            try:
+                os.remove(thumb)
+            except Exception as e:
+                logger.warning(f"Failed to remove thumbnail {thumb}: {e}")
 
+        # Remove any cancel request
         if uid in cancel_downloads:
             cancel_downloads.pop(uid, None)
             
