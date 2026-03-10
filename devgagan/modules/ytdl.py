@@ -22,7 +22,7 @@ import string
 import requests
 import logging
 import math
-from shared_client import client, app
+from devgagan import client, app
 from telethon import events
 from telethon.sync import TelegramClient
 from telethon.tl.types import DocumentAttributeVideo
