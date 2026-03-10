@@ -222,7 +222,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
             f.write(cookies)
             temp_cookie = f.name
 
-    out_path = f"{fname}.mp3"
+    out_path = f"{random_filename}.mp3"
     # ADD THIS LINE
     random_filename = get_random_string()
     
