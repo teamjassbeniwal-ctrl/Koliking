@@ -1,8 +1,8 @@
 # ---------------------------------------------------
-# File Name: ytdl.py (Pyrogram-only, self-contained)
+# File Name: ytdl.py (Fixed version – uses your cookie files)
 # Description: Download videos/audio from YouTube & other sites
 # Author: Gagan
-# Version: 4.0.4 (Indentation fixed)
+# Version: 4.1.1 (Cookies file fix, zero‑byte check, cancellation)
 # License: MIT
 # ---------------------------------------------------
 
@@ -15,7 +15,6 @@ import random
 import string
 import requests
 import logging
-import math
 import subprocess
 import json
 from pyrogram import Client, filters
@@ -24,7 +23,6 @@ from devgagan import app
 from concurrent.futures import ThreadPoolExecutor
 import aiohttp
 import aiofiles
-from config import YT_COOKIES, INSTA_COOKIES
 from mutagen.id3 import ID3, TIT2, TPE1, COMM, APIC
 from mutagen.mp3 import MP3
 
@@ -35,7 +33,7 @@ ongoing_downloads = {}
 cancel_downloads = {}  # Track cancellation requests
 
 # -------------------------------------------------------------------
-#  Self‑contained helper functions
+#  Helper functions
 # -------------------------------------------------------------------
 def get_random_string(length=7):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
@@ -88,11 +86,7 @@ async def screenshot(file_path, duration, user_id):
     Extract a frame at 1/3 of video duration and return thumbnail path.
     """
     thumb = os.path.join(tempfile.gettempdir(), f"thumb_{user_id}_{int(time.time())}.jpg")
-    # take frame at 33% into video
-    if duration > 0:
-        seek = min(duration * 0.33, 30)  # max 30 seconds
-    else:
-        seek = 5
+    seek = min(duration * 0.33, 30) if duration > 0 else 5
     cmd = [
         'ffmpeg', '-i', file_path, '-ss', str(seek),
         '-vframes', '1', '-q:v', '2', thumb, '-y'
@@ -120,16 +114,16 @@ async def fetch_video_info(url, ydl_opts, progress_message, check_duration_and_s
         info = ydl.extract_info(url, download=False)
         if check_duration_and_size:
             dur = info.get('duration', 0)
-            if dur > 3*3600:
+            if dur > 3 * 3600:
                 await progress_message.edit_text("**__Video >3h – aborted.__**")
                 return None
             size = info.get('filesize_approx', 0)
-            if size > 2*1024**3:
+            if size > 2 * 1024 ** 3:
                 await progress_message.edit_text("**__Video >2GB – aborted.__**")
                 return None
         return info
 
-# Progress callback for fast_upload
+# Progress callback for upload
 user_progress = {}
 def progress_callback(done, total, chat_id, user_id):
     if user_id in cancel_downloads and cancel_downloads[user_id]:
@@ -165,6 +159,34 @@ def format_duration(seconds):
     s = seconds % 60
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
+def humanbytes(size):
+    if not size:
+        return ""
+    p = 0
+    labels = ['B', 'KB', 'MB', 'GB', 'TB']
+    while size > 1024 and p < 4:
+        size /= 1024
+        p += 1
+    return f"{round(size, 2)} {labels[p]}"
+
+def time_formatter(ms):
+    s, ms = divmod(ms, 1000)
+    m, s = divmod(s, 60)
+    h, m = divmod(m, 60)
+    d, h = divmod(h, 24)
+    parts = []
+    if d:
+        parts.append(f"{d}d")
+    if h:
+        parts.append(f"{h}h")
+    if m:
+        parts.append(f"{m}m")
+    if s:
+        parts.append(f"{s}s")
+    if ms and not parts:
+        parts.append(f"{ms}ms")
+    return ' '.join(parts) if parts else "0s"
+
 # -------------------------------------------------------------------
 #  Cancel command
 # -------------------------------------------------------------------
@@ -190,174 +212,153 @@ async def adl_handler(client: Client, message: Message):
         await message.reply_text("**Usage:** `/adl <link>`")
         return
     url = message.command[1]
+
+    # Handle playlist
+    if "playlist" in url or "&list=" in url:
+        await message.reply_text("**__Playlist detected – downloading all...__**")
+        await process_audio_playlist(client, message, url)
+        return
+
     ongoing_downloads[uid] = True
-    if uid in cancel_downloads:
-        del cancel_downloads[uid]
+    cancel_downloads.pop(uid, None)  # Ensure clean start
     try:
         if "instagram.com" in url:
-            await process_audio(client, message, url, "INSTA_COOKIES")
-        elif "youtube.com" in url or "youtu.be" in url:
-            await process_audio(client, message, url, "YT_COOKIES")
-        else:
-            await process_audio(client, message, url)
+            await process_audio(client, message, url, is_instagram=True)
+        else:  # YouTube or others
+            await process_audio(client, message, url, is_instagram=False)
     except Exception as e:
         await message.reply_text(f"**Error:** `{e}`")
     finally:
         ongoing_downloads.pop(uid, None)
+        cancel_downloads.pop(uid, None)
 
-async def process_audio(client: Client, message: Message, url: str, cookies_env_var=None):
-
+async def process_audio(client: Client, message: Message, url: str, is_instagram: bool = False):
     uid = message.from_user.id
-
-    if "playlist" in url or "&list=" in url:
-        await message.reply_text("**__Playlist detected – downloading all...__**")
-        await process_audio_playlist(client, message, url, cookies_env_var)
-        return
-
-    cookies = cookies_env_var if cookies_env_var else None
-    temp_cookie = None
-
-    if cookies:
-        with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt") as f:
-            f.write(cookies)
-            temp_cookie = f.name
-
-    
-    # ADD THIS LINE
-    random_filename = get_random_string()
-    out_path = f"{random_filename}.mp3"
-    
-    ydl_opts = {
-    'format': 'bestaudio/best',
-    'outtmpl': f"{random_filename}.%(ext)s",
-    'cookiefile': '/app/cookies/youtube.txt',
-    'quiet': False,
-    'noplaylist': True,
-    'js_runtimes': {'node': {}},
-    'remote_components': ['ejs:github'],
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'web']
-        }
-    },
-    'http_headers': {
-        'User-Agent': 'Mozilla/5.0'
-    }
-    }
-
+    out_path = None
     prog_msg = await message.reply_text("**__Starting audio extraction...__**")
 
     try:
+        # Determine cookie file path
+        cookie_file = None
+        if is_instagram:
+            cookie_path = '/app/cookies/instagram.txt'
+            if os.path.exists(cookie_path):
+                cookie_file = cookie_path
+        else:
+            cookie_path = '/app/cookies/youtube.txt'
+            if os.path.exists(cookie_path):
+                cookie_file = cookie_path
 
+        random_filename = get_random_string()
+        out_path = f"{random_filename}.mp3"
+
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': f"{random_filename}.%(ext)s",
+            'quiet': True,
+            'noplaylist': True,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web']
+                }
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0'
+            }
+        }
+        if cookie_file:
+            ydl_opts['cookiefile'] = cookie_file
+
+        # Check cancellation before download
         if await check_cancelled(uid):
             await prog_msg.edit_text("**__Cancelled.__**")
             return
 
+        # Download and extract audio
         info = await extract_audio_async(ydl_opts, url)
 
         if await check_cancelled(uid):
             await prog_msg.edit_text("**__Cancelled.__**")
-            if os.path.exists(out_path):
-                os.remove(out_path)
             return
 
-        title = info.get("title", "Audio")
+        # Verify file exists and is not empty
+        if not os.path.exists(out_path) or os.path.getsize(out_path) == 0:
+            raise Exception("Downloaded audio file is missing or empty (0 B).")
 
+        title = info.get("title", "Audio")
         await prog_msg.edit_text("**__Editing metadata...__**")
 
-        if os.path.exists(out_path):
+        # Add metadata
+        def add_metadata():
+            audio = MP3(out_path, ID3=ID3)
+            try:
+                audio.add_tags()
+            except:
+                pass
+            audio.tags["TIT2"] = TIT2(encoding=3, text=title)
+            audio.tags["TPE1"] = TPE1(encoding=3, text="Team SPY")
+            audio.tags["COMM"] = COMM(encoding=3, lang="eng", text="Powered by Team SPY")
 
-            def meta():
-
-                audio = MP3(out_path, ID3=ID3)
-
+            thumb_url = info.get("thumbnail")
+            if thumb_url:
+                thumb_path = os.path.join(tempfile.gettempdir(), f"{get_random_string()}.jpg")
                 try:
-                    audio.add_tags()
-                except:
-                    pass
-
-                audio.tags["TIT2"] = TIT2(encoding=3, text=title)
-                audio.tags["TPE1"] = TPE1(encoding=3, text="Team SPY")
-                audio.tags["COMM"] = COMM(encoding=3, lang="eng", text="Powered by Team SPY")
-
-                thumb_url = info.get("thumbnail")
-
-                if thumb_url:
-                    thumb_path = os.path.join(tempfile.gettempdir(), f"{get_random_string()}.jpg")
-
-                    import requests
-                    r = requests.get(thumb_url)
-
-                    with open(thumb_path, "wb") as f:
+                    r = requests.get(thumb_url, timeout=10)
+                    with open(thumb_path, 'wb') as f:
                         f.write(r.content)
-
-                    with open(thumb_path, "rb") as img:
+                    with open(thumb_path, 'rb') as img:
                         audio.tags["APIC"] = APIC(
                             encoding=3,
                             mime="image/jpeg",
                             type=3,
                             data=img.read()
                         )
+                except Exception as e:
+                    logger.error(f"Thumbnail embedding failed: {e}")
+                finally:
+                    if os.path.exists(thumb_path):
+                        os.remove(thumb_path)
+            audio.save()
 
-                    os.remove(thumb_path)
+        await asyncio.to_thread(add_metadata)
 
-                audio.save()
+        if await check_cancelled(uid):
+            await prog_msg.edit_text("**__Cancelled.__**")
+            return
 
-            await asyncio.to_thread(meta)
+        await prog_msg.delete()
+        prog = await client.send_message(message.chat.id, "**__Uploading...__**")
 
-            if await check_cancelled(uid):
-                await prog_msg.edit_text("**__Cancelled.__**")
-                if os.path.exists(out_path):
-                    os.remove(out_path)
-                return
-
-            await prog_msg.delete()
-
-            prog = await client.send_message(
-                message.chat.id,
-                "**__Uploading...__**"
+        try:
+            await client.send_audio(
+                chat_id=message.chat.id,
+                audio=out_path,
+                caption=f"**{title}**\n\n__Powered by Team JB__",
+                title=title,
+                performer="Team JB",
+                progress=progress_callback,
+                progress_args=(message.chat.id, uid)
             )
-
-            try:
-
-                await client.send_audio(
-                    chat_id=message.chat.id,
-                    audio=out_path,
-                    caption=f"**{title}**\n\n__Powered by Team JB__",
-                    title=title,
-                    performer="Team JB",
-                    progress=progress_callback,
-                    progress_args=(message.chat.id, uid)
-                )
-
-            finally:
-                await prog.delete()
-
-        else:
-            await message.reply_text("**__Audio file missing!__**")
+        finally:
+            await prog.delete()
 
     except Exception as e:
         logger.exception("Audio error")
         await message.reply_text(f"**__Error: {e}__**")
-
     finally:
-
-        if os.path.exists(out_path):
+        # Cleanup
+        if out_path and os.path.exists(out_path):
             os.remove(out_path)
 
-        if temp_cookie and os.path.exists(temp_cookie):
-            os.remove(temp_cookie)
-
-        if uid in cancel_downloads:
-            cancel_downloads.pop(uid, None)
-
-async def process_audio_playlist(client, message, url, cookies_env_var):
+async def process_audio_playlist(client, message, url):
     uid = message.from_user.id
+    ongoing_downloads[uid] = True  # Prevent multiple playlists
+    cancel_downloads.pop(uid, None)
     prog = await message.reply_text("**__Extracting playlist...__**")
     try:
         ydl_opts = {'quiet': True, 'extract_flat': True}
@@ -365,7 +366,9 @@ async def process_audio_playlist(client, message, url, cookies_env_var):
             info = ydl.extract_info(url, download=False)
         if 'entries' not in info:
             await prog.edit_text("**__No playlist found.__**")
-            return await process_audio(client, message, url, cookies_env_var)
+            # Fallback to single video
+            await process_audio(client, message, url)
+            return
         total = len(info['entries'])
         await prog.edit_text(f"**__Playlist: {info.get('title','')}__**\n**Total: {total}**")
         good = fail = 0
@@ -375,7 +378,7 @@ async def process_audio_playlist(client, message, url, cookies_env_var):
                 return
             vid_url = f"https://youtube.com/watch?v={entry['id']}"
             try:
-                await process_audio(client, message, vid_url, cookies_env_var)
+                await process_audio(client, message, vid_url)
                 good += 1
             except Exception as e:
                 fail += 1
@@ -384,6 +387,9 @@ async def process_audio_playlist(client, message, url, cookies_env_var):
         await message.reply_text(f"**__Playlist done! Success: {good}, Failed: {fail}__**")
     except Exception as e:
         await message.reply_text(f"**__Error: {e}__**")
+    finally:
+        ongoing_downloads.pop(uid, None)
+        cancel_downloads.pop(uid, None)
 
 # -------------------------------------------------------------------
 #  Video download
@@ -398,72 +404,70 @@ async def dl_handler(client: Client, message: Message):
         await message.reply_text("**Usage:** `/dl <link>`")
         return
     url = message.command[1]
+
     if "playlist" in url or "&list=" in url:
         await message.reply_text("**__Playlist detected – downloading all...__**")
-        await process_video_playlist(client, message, url, None)
+        await process_video_playlist(client, message, url)
         return
+
     ongoing_downloads[uid] = True
-    if uid in cancel_downloads:
-        del cancel_downloads[uid]
+    cancel_downloads.pop(uid, None)
     try:
         if "instagram.com" in url:
-            await process_video(client, message, url, "INSTA_COOKIES", False)
-        elif "youtube.com" in url or "youtu.be" in url:
-            await process_video(client, message, url, "YT_COOKIES", True)
+            await process_video(client, message, url, is_instagram=True)
         else:
-            await process_video(client, message, url, None, False)
+            await process_video(client, message, url, is_instagram=False)
     except Exception as e:
         await message.reply_text(f"**Error:** `{e}`")
     finally:
         ongoing_downloads.pop(uid, None)
+        cancel_downloads.pop(uid, None)
 
-
-async def process_video(client, message, url, cookies_env_var, check_duration):
-
+async def process_video(client, message, url, is_instagram=False):
     uid = message.from_user.id
-    cookies = cookies_env_var if cookies_env_var else None
-    temp_cookie = None
     thumb = None
-
-    if cookies:
-        with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt") as f:
-            f.write(cookies)
-            temp_cookie = f.name
-
-    out_name = get_random_string()
-    out_path = os.path.abspath(out_name)
-    
-    # ADD THIS LINE
-    download_path = f"{out_name}.%(ext)s"
-    # yt-dlp options
-    ydl_opts = {
-    'outtmpl': download_path,
-    'format': 'bv*+ba/b',
-    'cookiefile': '/app/cookies/youtube.txt',
-    'writethumbnail': True,
-    'verbose': True,
-    'noplaylist': True,
-    'js_runtimes': {'node': {}},
-    'remote_components': ['ejs:github'],
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'web']
-        }
-    },
-    'http_headers': {
-        'User-Agent': 'Mozilla/5.0'
-    }
-    }
-
+    downloaded_file = None
     prog_msg = await message.reply_text("**Starting download...**")
 
     try:
+        # Determine cookie file path
+        cookie_file = None
+        if is_instagram:
+            cookie_path = '/app/cookies/instagram.txt'
+            if os.path.exists(cookie_path):
+                cookie_file = cookie_path
+        else:
+            cookie_path = '/app/cookies/youtube.txt'
+            if os.path.exists(cookie_path):
+                cookie_file = cookie_path
+
+        out_name = get_random_string()
+        download_path = f"{out_name}.%(ext)s"
+
+        ydl_opts = {
+            'outtmpl': download_path,
+            'format': 'bv*+ba/b',
+            'writethumbnail': False,  # we handle thumbnail separately
+            'quiet': True,
+            'noplaylist': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web']
+                }
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0'
+            }
+        }
+        if cookie_file:
+            ydl_opts['cookiefile'] = cookie_file
 
         if await check_cancelled(uid):
             await prog_msg.edit_text("**Cancelled.**")
             return
 
-        # Extract video info
+        # Extract info (with size/duration check for YouTube)
+        check_duration = not is_instagram  # only check duration for YouTube
         try:
             info = await fetch_video_info(url, ydl_opts, prog_msg, check_duration)
         except Exception as e:
@@ -478,90 +482,64 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
         await asyncio.to_thread(download_video, url, ydl_opts)
 
         # Find downloaded file
-        downloaded_file = None
-        for f in os.listdir("."):
+        for f in os.listdir('.'):
             if f.startswith(out_name):
                 downloaded_file = os.path.abspath(f)
                 break
 
         if not downloaded_file or not os.path.exists(downloaded_file):
-            await message.reply_text("**Downloaded file not found!**")
-            return
+            raise Exception("Downloaded file not found!")
+
+        # Check file size
+        if os.path.getsize(downloaded_file) == 0:
+            raise Exception("Downloaded file is empty (0 B).")
 
         # Convert to MP4 if needed
-        if not downloaded_file.endswith(".mp4"):
-
-            mp4_path = os.path.abspath(out_name + ".mp4")
-
+        if not downloaded_file.endswith('.mp4'):
+            mp4_path = os.path.abspath(out_name + '.mp4')
             try:
                 subprocess.run(
-                    ["ffmpeg", "-i", downloaded_file, "-c", "copy", mp4_path, "-y"],
+                    ['ffmpeg', '-i', downloaded_file, '-c', 'copy', mp4_path, '-y'],
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
+                    stderr=subprocess.DEVNULL,
+                    check=True
                 )
-
                 os.remove(downloaded_file)
                 downloaded_file = mp4_path
-
             except Exception as e:
                 logger.warning(f"MP4 conversion failed: {e}")
 
         # Metadata
-        title = info.get("title", "Video")
+        title = info.get('title', 'Video')
         meta = get_video_metadata(downloaded_file) or {}
-
-        width = meta.get("width") or 1280
-        height = meta.get("height") or 720
-        duration = int(meta.get("duration") or 0)
+        width = meta.get('width', 1280)
+        height = meta.get('height', 720)
+        duration = int(meta.get('duration', 0))
 
         # Thumbnail
-        thumb_url = info.get("thumbnail")
-
+        thumb_url = info.get('thumbnail')
         if thumb_url:
-            thumb_path = os.path.join(
-                tempfile.gettempdir(),
-                get_random_string() + ".jpg"
-            )
-
+            thumb_path = os.path.join(tempfile.gettempdir(), f"{get_random_string()}.jpg")
             dl = d_thumbnail(thumb_url, thumb_path)
-
             if dl and os.path.exists(dl):
                 thumb = dl
 
         if not thumb:
-            try:
-                thumb = await screenshot(downloaded_file, duration, uid)
-            except:
-                thumb = None
+            thumb = await screenshot(downloaded_file, duration, uid)
 
-        chat = message.chat.id
         caption = f"{title}\nDuration: {format_duration(duration)}"
 
-        # Large file splitting
+        # Large file splitting (>2GB)
         if os.path.getsize(downloaded_file) > 2 * 1024 ** 3:
-
-            prog = await client.send_message(chat, "**Large file – splitting...**")
-
-            await split_and_upload_file(
-                client,
-                chat,
-                downloaded_file,
-                caption,
-                uid
-            )
-
+            prog = await client.send_message(message.chat.id, "**Large file – splitting...**")
+            await split_and_upload_file(client, message.chat.id, downloaded_file, caption, uid)
             await prog.delete()
-
         else:
-
             await prog_msg.delete()
-
-            prog = await client.send_message(chat, "**Uploading...**")
-
+            prog = await client.send_message(message.chat.id, "**Uploading...**")
             try:
-
                 await client.send_video(
-                    chat_id=chat,
+                    chat_id=message.chat.id,
                     video=downloaded_file,
                     caption=caption,
                     supports_streaming=True,
@@ -570,38 +548,35 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
                     height=height,
                     thumb=thumb if thumb and os.path.exists(thumb) else None,
                     progress=progress_callback,
-                    progress_args=(chat, uid)
+                    progress_args=(message.chat.id, uid)
                 )
-
             finally:
                 await prog.delete()
 
     except Exception as e:
-
         logger.exception("Video error")
         await message.reply_text(f"**Error:** `{e}`")
-
     finally:
-
-        # Cleanup
-        for f in os.listdir("."):
+        # Cleanup downloaded file
+        if downloaded_file and os.path.exists(downloaded_file):
+            try:
+                os.remove(downloaded_file)
+            except:
+                pass
+        # Also remove any other files starting with out_name (partials)
+        for f in os.listdir('.'):
             if f.startswith(out_name):
                 try:
-                    os.remove(os.path.join(".", f))
+                    os.remove(os.path.join('.', f))
                 except:
                     pass
-
-        if temp_cookie and os.path.exists(temp_cookie):
-            os.remove(temp_cookie)
-
         if thumb and os.path.exists(thumb):
             os.remove(thumb)
 
-        if uid in cancel_downloads:
-            cancel_downloads.pop(uid, None)
-            
-async def process_video_playlist(client, message, url, cookies_env_var):
+async def process_video_playlist(client, message, url):
     uid = message.from_user.id
+    ongoing_downloads[uid] = True
+    cancel_downloads.pop(uid, None)
     prog = await message.reply_text("**__Extracting playlist...__**")
     try:
         ydl_opts = {'quiet': True, 'extract_flat': True}
@@ -609,7 +584,8 @@ async def process_video_playlist(client, message, url, cookies_env_var):
             info = ydl.extract_info(url, download=False)
         if 'entries' not in info:
             await prog.edit_text("**__No playlist found.__**")
-            return await process_video(client, message, url, cookies_env_var, True)
+            await process_video(client, message, url)
+            return
         total = len(info['entries'])
         await prog.edit_text(f"**__Playlist: {info.get('title','')}__**\n**Total: {total}**")
         good = fail = 0
@@ -619,7 +595,7 @@ async def process_video_playlist(client, message, url, cookies_env_var):
                 return
             vid_url = f"https://youtube.com/watch?v={entry['id']}"
             try:
-                await process_video(client, message, vid_url, cookies_env_var, True)
+                await process_video(client, message, vid_url)
                 good += 1
             except Exception as e:
                 fail += 1
@@ -628,6 +604,9 @@ async def process_video_playlist(client, message, url, cookies_env_var):
         await message.reply_text(f"**__Playlist done! Success: {good}, Failed: {fail}__**")
     except Exception as e:
         await message.reply_text(f"**__Error: {e}__**")
+    finally:
+        ongoing_downloads.pop(uid, None)
+        cancel_downloads.pop(uid, None)
 
 # -------------------------------------------------------------------
 #  Split & upload large files (>2GB)
@@ -652,7 +631,8 @@ async def split_and_upload_file(client, chat_id, file_path, caption, user_id):
             while True:
                 if await check_cancelled(user_id):
                     await client.send_message(chat_id, "**__Cancelled.__**")
-                    if os.path.exists(part_file): os.remove(part_file)
+                    if os.path.exists(part_file):
+                        os.remove(part_file)
                     return
                 chunk = await f.read(CHUNK)
                 if not chunk:
@@ -667,20 +647,22 @@ async def split_and_upload_file(client, chat_id, file_path, caption, user_id):
                     await client.send_video(
                         chat_id, video=part_file, caption=part_cap,
                         thumb=thumb, supports_streaming=True,
-                        progress=progress_bar, progress_args=("Uploading...", edit, time.time(), user_id)
+                        progress=progress_callback, progress_args=(chat_id, user_id)
                     )
-                    if thumb and os.path.exists(thumb): os.remove(thumb)
+                    if thumb and os.path.exists(thumb):
+                        os.remove(thumb)
                     os.remove(part_file)
                     part_num += 1
                     written = 0
                     part_file = f"{base}.part{str(part_num).zfill(3)}{ext}"
                     pf = await aiofiles.open(part_file, 'wb')
 
-    # last part
+    # Last part
     if os.path.exists(part_file) and os.path.getsize(part_file) > 0:
         if await check_cancelled(user_id):
             await client.send_message(chat_id, "**__Cancelled.__**")
-            if os.path.exists(part_file): os.remove(part_file)
+            if os.path.exists(part_file):
+                os.remove(part_file)
             return
         edit = await client.send_message(chat_id, f"Uploading part {part_num+1}...")
         part_cap = f"{caption}\n\n**Part {part_num+1}**"
@@ -688,55 +670,14 @@ async def split_and_upload_file(client, chat_id, file_path, caption, user_id):
         await client.send_video(
             chat_id, video=part_file, caption=part_cap,
             thumb=thumb, supports_streaming=True,
-            progress=progress_bar, progress_args=("Uploading...", edit, time.time(), user_id)
+            progress=progress_callback, progress_args=(chat_id, user_id)
         )
-        if thumb and os.path.exists(thumb): os.remove(thumb)
+        if thumb and os.path.exists(thumb):
+            os.remove(thumb)
         os.remove(part_file)
 
     await start_msg.delete()
     os.remove(file_path)
 
-async def progress_bar(current, total, ud_type, message, start, user_id):
-    if await check_cancelled(user_id):
-        raise Exception("Upload cancelled")
-    now = time.time()
-    diff = now - start
-    if round(diff % 10) == 0 or current == total:
-        pct = (current / total) * 100
-        speed = current / diff if diff else 0
-        elapsed = round(diff * 1000)
-        eta = round((total - current) / speed) * 1000 if speed else 0
-        total_time = elapsed + eta
-        progress = "█" * (int(pct)//10) + "░" * (10 - int(pct)//10)
-        txt = (
-            f"╭────────────────────╮\n│    **{ud_type}**   │\n├────────────────────┤\n│ {progress}\n\n"
-            f"Completed: {humanbytes(current)}/{humanbytes(total)}\nBytes: {pct:.2f}%\n"
-            f"Speed: {humanbytes(speed)}/s\nETA: {time_formatter(eta)}\n"
-            f"│ **__Use /cancel to stop__**\n╰────────────────────╯"
-        )
-        try:
-            await message.edit_text(txt)
-        except:
-            pass
 
-def humanbytes(size):
-    if not size: return ""
-    p = 0
-    labels = ['B','KB','MB','GB','TB']
-    while size > 1024 and p < 4:
-        size /= 1024
-        p += 1
-    return f"{round(size,2)} {labels[p]}"
 
-def time_formatter(ms):
-    s, ms = divmod(ms, 1000)
-    m, s = divmod(s, 60)
-    h, m = divmod(m, 60)
-    d, h = divmod(h, 24)
-    parts = []
-    if d: parts.append(f"{d}d")
-    if h: parts.append(f"{h}h")
-    if m: parts.append(f"{m}m")
-    if s: parts.append(f"{s}s")
-    if ms and not parts: parts.append(f"{ms}ms")
-    return ' '.join(parts) if parts else "0s"
