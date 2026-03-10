@@ -234,7 +234,6 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     }],
     "noplaylist": True,
     "js_runtimes": {"node": {}},
-    "remote_components": {"ejs": ["github"]},
     "extractor_args": {
         "youtube": {
             "player_client": ["web", "ios"]
@@ -401,7 +400,6 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
 
     # Important for YouTube JS challenge
     "js_runtimes": {"node": {}},
-    "remote_components": {"ejs": ["github"]},
 
     "extractor_args": {
         "youtube": {
@@ -474,19 +472,23 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
         h = meta['height'] or 720
         dur = int(meta['duration']) if meta['duration'] else 0
 
-        # Thumbnail
         thumb = None
-        thumb_url = info.get('thumbnail')
-        if thumb_url:
-            thumb_path = os.path.join(tempfile.gettempdir(), get_random_string()+".jpg")
-            dl = d_thumbnail(thumb_url, thumb_path)
-            if dl:
-                thumb = dl
-        if not thumb:
-            thumb = await screenshot(downloaded_file, dur, uid)
+thumb_url = info.get("thumbnail") if info else None
 
-        chat = message.chat.id
-        caption = f"**{title}**\n**Duration:** {format_duration(dur)}"
+if thumb_url:
+    thumb_path = os.path.join(tempfile.gettempdir(), get_random_string() + ".jpg")
+    dl = d_thumbnail(thumb_url, thumb_path)
+    if dl:
+        thumb = dl
+
+if not thumb:
+    try:
+        thumb = await screenshot(downloaded_file, dur, uid)
+    except:
+        thumb = None
+
+chat = message.chat.id
+caption = f"**{title}**\n**Duration:** {format_duration(dur)}"
 
         # Large file >2GB → split
         if os.path.exists(downloaded_file) and os.path.getsize(downloaded_file) > 2*1024**3:
