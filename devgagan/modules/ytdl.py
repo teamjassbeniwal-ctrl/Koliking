@@ -1,8 +1,8 @@
-# --------------------------------------------------
+# ---------------------------------------------------
 # File Name: ytdl.py (Pyrogram-only, self-contained)
 # Description: Download videos/audio from YouTube & other sites
 # Author: Gagan
-# Version: 4.0.2
+# Version: 4.0.4 (Indentation fixed)
 # License: MIT
 # ---------------------------------------------------
 
@@ -36,7 +36,7 @@ ongoing_downloads = {}
 cancel_downloads = {}  # Track cancellation requests
 
 # -------------------------------------------------------------------
-#  Self‑contained helper functions (no external imports needed)
+#  Self‑contained helper functions
 # -------------------------------------------------------------------
 def get_random_string(length=7):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
@@ -332,46 +332,6 @@ async def process_audio_playlist(client, message, url, cookies_env_var):
             vid_url = f"https://youtube.com/watch?v={entry['id']}"
             try:
                 await process_audio(client, message, vid_url, cookies_env_var)
-                good += 1
-            except Exception as e:
-                fail += 1
-                logger.error(f"Failed {vid_url}: {e}")
-            await prog.edit_text(f"**__Progress: {good}/{total} downloaded, {fail} failed.__**")
-        await message.reply_text(f"**__Playlist done! Success: {good}, Failed: {fail}__**")
-    except Exception as e:
-        await message.reply_text(f"**__Error: {e}__**")
-
-#         if "cancelled" in str(e).lower():
-            await message.reply_text("**__Process cancelled.__**")
-        else:
-            logger.exception("Video error")
-            await message.reply_text(f"**__Error: {e}__**")
-    finally:
-        if os.path.exists(out_path): os.remove(out_path)
-        if temp_cookie and os.path.exists(temp_cookie): os.remove(temp_cookie)
-        if thumb and os.path.exists(thumb): os.remove(thumb)
-        if uid in cancel_downloads: cancel_downloads.pop(uid, None)
-
-async def process_video_playlist(client, message, url, cookies_env_var):
-    uid = message.from_user.id
-    prog = await message.reply_text("**__Extracting playlist...__**")
-    try:
-        ydl_opts = {'quiet': True, 'extract_flat': True}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-        if 'entries' not in info:
-            await prog.edit_text("**__No playlist found.__**")
-            return await process_video(client, message, url, cookies_env_var, True)
-        total = len(info['entries'])
-        await prog.edit_text(f"**__Playlist: {info.get('title','')}__**\n**Total: {total}**")
-        good = fail = 0
-        for entry in info['entries']:
-            if await check_cancelled(uid):
-                await message.reply_text(f"**__Cancelled. Downloaded: {good}/{total}__**")
-                return
-            vid_url = f"https://youtube.com/watch?v={entry['id']}"
-            try:
-                await process_video(client, message, vid_url, cookies_env_var, True)
                 good += 1
             except Exception as e:
                 fail += 1
