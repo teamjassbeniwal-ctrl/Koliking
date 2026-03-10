@@ -8,18 +8,18 @@ import string
 import requests
 import logging
 import math
-from shared_client import client, app
-from telethon import events
-from telethon.sync import TelegramClient
-from telethon.tl.types import DocumentAttributeVideo
-from utils.func import get_video_metadata, screenshot
-from devgagantools import fast_upload
+import subprocess
+import json
+from pyrogram import Client, filters
+from pyrogram.types import Message
+from devgagan import app
 from concurrent.futures import ThreadPoolExecutor
-import aiohttp 
+import aiohttp
 import aiofiles
 from config import YT_COOKIES, INSTA_COOKIES
 from mutagen.id3 import ID3, TIT2, TPE1, COMM, APIC
 from mutagen.mp3 import MP3
+
 
 logger = logging.getLogger(__name__)
 
