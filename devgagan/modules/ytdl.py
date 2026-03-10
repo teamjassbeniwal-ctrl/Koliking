@@ -234,6 +234,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     }],
     "noplaylist": True,
     "js_runtimes": {"node": {}},
+    "remote_components": ["ejs:github"],
     "extractor_args": {
         "youtube": {
             "player_client": ["web", "ios"]
@@ -401,6 +402,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
         "ignoreerrors": True,
         "retries": 10,
         "js_runtimes": {"node": {}},
+        "remote_components": ["ejs:github"],
         "extractor_args": {
             "youtube": {
                 "player_client": ["web", "ios"]
