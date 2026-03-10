@@ -383,6 +383,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     uid = message.from_user.id
     cookies = cookies_env_var if cookies_env_var else None
     temp_cookie = None
+    thumb = None
 
     if cookies:
         with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt") as f:
@@ -394,45 +395,33 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
 
     # yt-dlp options
     ydl_opts = {
-        "format": "bestvideo*+bestaudio/best",
+        "format": "bv*+ba/b",
         "outtmpl": out_path + ".%(ext)s",
         "cookiefile": "/app/cookies/youtube.txt",
-        "writethumbnail": True,
         "noplaylist": True,
         "ignoreerrors": True,
         "retries": 10,
-        "js_runtimes": {"node": {}},
-        "remote_components": ["ejs:github"],
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["web", "ios"]
-            }
-        },
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0"
-        }
+        "quiet": True,
+        "http_headers": {"User-Agent": "Mozilla/5.0"}
     }
 
-    prog_msg = await message.reply_text("**__Starting download...__**")
+    prog_msg = await message.reply_text("**Starting download...**")
 
     try:
 
         if await check_cancelled(uid):
-            await prog_msg.edit_text("**__Cancelled.__**")
+            await prog_msg.edit_text("**Cancelled.**")
             return
 
-        # Extract info
+        # Extract video info
         try:
             info = await fetch_video_info(url, ydl_opts, prog_msg, check_duration)
         except Exception as e:
-            await prog_msg.edit_text(f"**__Info extraction failed: {e}__**")
+            await prog_msg.edit_text(f"**Info extraction failed:** `{e}`")
             return
 
         if not info:
-            return
-
-        if await check_cancelled(uid):
-            await prog_msg.edit_text("**__Cancelled.__**")
+            await prog_msg.edit_text("**Failed to get video info.**")
             return
 
         # Download video
@@ -446,35 +435,37 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
                 break
 
         if not downloaded_file or not os.path.exists(downloaded_file):
-            await message.reply_text("**__Downloaded file not found!__**")
+            await message.reply_text("**Downloaded file not found!**")
             return
 
-        # Convert to mp4
+        # Convert to MP4 if needed
         if not downloaded_file.endswith(".mp4"):
+
             mp4_path = os.path.abspath(out_name + ".mp4")
-            convert_cmd = ["ffmpeg", "-i", downloaded_file, "-c", "copy", mp4_path, "-y"]
 
             try:
-                subprocess.run(convert_cmd, check=True,
-                               stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL)
+                subprocess.run(
+                    ["ffmpeg", "-i", downloaded_file, "-c", "copy", mp4_path, "-y"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
 
                 os.remove(downloaded_file)
                 downloaded_file = mp4_path
+
             except Exception as e:
-                logger.warning(f"Conversion to mp4 failed: {e}")
+                logger.warning(f"MP4 conversion failed: {e}")
 
         # Metadata
         title = info.get("title", "Video")
-        meta = get_video_metadata(downloaded_file)
+        meta = get_video_metadata(downloaded_file) or {}
 
-        w = meta.get("width") or 1280
-        h = meta.get("height") or 720
-        dur = int(meta.get("duration") or 0)
+        width = meta.get("width") or 1280
+        height = meta.get("height") or 720
+        duration = int(meta.get("duration") or 0)
 
         # Thumbnail
-        thumb = None
-        thumb_url = info.get("thumbnail") if info else None
+        thumb_url = info.get("thumbnail")
 
         if thumb_url:
             thumb_path = os.path.join(
@@ -483,60 +474,62 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
             )
 
             dl = d_thumbnail(thumb_url, thumb_path)
-            if dl:
+
+            if dl and os.path.exists(dl):
                 thumb = dl
 
         if not thumb:
             try:
-                thumb = await screenshot(downloaded_file, dur, uid)
+                thumb = await screenshot(downloaded_file, duration, uid)
             except:
                 thumb = None
 
         chat = message.chat.id
-        caption = f"{title}\nDuration: {format_duration(dur)}"
+        caption = f"{title}\nDuration: {format_duration(duration)}"
 
-        # Split large files
+        # Large file splitting
         if os.path.getsize(downloaded_file) > 2 * 1024 ** 3:
 
-            prog = await client.send_message(chat, "**__Large file – splitting...__**")
-            await split_and_upload_file(client, chat, downloaded_file, caption, uid)
+            prog = await client.send_message(chat, "**Large file – splitting...**")
 
-            if prog:
-                await prog.delete()
+            await split_and_upload_file(
+                client,
+                chat,
+                downloaded_file,
+                caption,
+                uid
+            )
+
+            await prog.delete()
 
         else:
 
             await prog_msg.delete()
-            prog = await client.send_message(chat, "**__Uploading...__**")
+
+            prog = await client.send_message(chat, "**Uploading...**")
 
             try:
 
-                uploaded = await fast_upload(
-                    client,
-                    downloaded_file,
-                    reply=prog,
-                    progress_bar_function=lambda d, t: progress_callback(d, t, chat, uid)
-                )
-
                 await client.send_video(
-                    chat,
-                    uploaded,
+                    chat_id=chat,
+                    video=downloaded_file,
                     caption=caption,
                     supports_streaming=True,
-                    duration=dur,
-                    width=w,
-                    height=h,
-                    thumb=thumb if thumb and os.path.exists(thumb) else None
+                    duration=duration,
+                    width=width,
+                    height=height,
+                    thumb=thumb if thumb and os.path.exists(thumb) else None,
+                    progress=progress_callback,
+                    progress_args=(chat, uid)
                 )
 
             finally:
-                if prog:
-                    await prog.delete()
+                await prog.delete()
 
     except Exception as e:
 
         logger.exception("Video error")
-        await message.reply_text(f"**__Error: {e}__**")
+        await message.reply_text(f"**Error:** `{e}`")
 
     finally:
 
