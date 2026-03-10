@@ -182,16 +182,6 @@ async def adl_handler(client: Client, message: Message):
 
     ongoing_downloads[uid] = True
     cancel_downloads.pop(uid, None)
-    try:
-        if "instagram.com" in url:
-            await process_audio(client, message, url, is_instagram=True)
-        else:
-            await process_audio(client, message, url, is_instagram=False)
-    except Exception as e:
-        await message.reply_text(f"**Error:** `{e}`")
-    finally:
-        ongoing_downloads.pop(uid, None)
-        cancel_downloads.pop(uid, None)
 
 async def process_audio(client: Client, message: Message, url: str, is_instagram: bool = False):
     uid = message.from_user.id
@@ -199,6 +189,7 @@ async def process_audio(client: Client, message: Message, url: str, is_instagram
     prog_msg = await message.reply_text("**__Starting audio extraction...__**")
 
     try:
+        # --- Cookies ---
         cookie_file = None
         if is_instagram:
             cookie_path = '/app/cookies/instagram.txt'
@@ -209,49 +200,51 @@ async def process_audio(client: Client, message: Message, url: str, is_instagram
             if os.path.exists(cookie_path):
                 cookie_file = cookie_path
 
+        # --- Random filename ---
         random_filename = get_random_string()
-        out_path = f"{random_filename}.mp3"
-
-        # RESTORED extractor_args with multiple clients
-        ydl_opts = {
-    'format': 'bestaudio/best',
-    'outtmpl': f"{random_filename}.%(ext)s",
-    'cookiefile': '/app/cookies/youtube.txt',
-    'quiet': False,
-    'noplaylist': True,
-    'js_runtimes': {'node': {}},
-    'remote_components': ['ejs:github'],
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'web']
-        }
-    },
-    'http_headers': {
-        'User-Agent': 'Mozilla/5.0'
-    }
-        }
         
-        if cookie_file:
-            ydl_opts['cookiefile'] = cookie_file
+        # --- yt-dlp options ---
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': f"{random_filename}.%(ext)s",
+            'cookiefile': cookie_file if cookie_file else None,
+            'quiet': False,
+            'noplaylist': True,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web']
+                }
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0'
+            }
+        }
 
+        # --- Cancel check ---
         if await check_cancelled(uid):
             await prog_msg.edit_text("**__Cancelled.__**")
             return
 
+        # --- Extract audio ---
         info = await extract_audio_async(ydl_opts, url)
 
+        # ✅ Get actual downloaded file path
+        out_path = info['requested_downloads'][0]['filepath']
+
         if await check_cancelled(uid):
             await prog_msg.edit_text("**__Cancelled.__**")
             return
 
+        # --- Verify file exists ---
         if not os.path.exists(out_path) or os.path.getsize(out_path) == 0:
             raise Exception("Downloaded audio file is missing or empty (0 B).")
 
+        # --- Metadata & upload ---
         title = info.get("title", "Audio")
         await prog_msg.edit_text("**__Editing metadata...__**")
 
@@ -314,7 +307,7 @@ async def process_audio(client: Client, message: Message, url: str, is_instagram
     finally:
         if out_path and os.path.exists(out_path):
             os.remove(out_path)
-
+    
 async def process_audio_playlist(client, message, url):
     uid = message.from_user.id
     ongoing_downloads[uid] = True
