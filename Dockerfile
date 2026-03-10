@@ -14,6 +14,9 @@ RUN apt update && apt upgrade -y && \
         wget \
         bash \
         neofetch \
+        ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
         software-properties-common && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
