@@ -224,7 +224,9 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
 
     fname = f"@team_spy_pro_{uid}"
     out_path = f"{fname}.mp3"
-
+    # ADD THIS LINE
+    random_filename = get_random_string()
+    
     ydl_opts = {
     'format': 'bestaudio/best',
     'outtmpl': f"{random_filename}.%(ext)s",
@@ -430,7 +432,9 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
 
     out_name = get_random_string()
     out_path = os.path.abspath(out_name)
-
+    
+    # ADD THIS LINE
+    download_path = f"{out_name}.%(ext)s"
     # yt-dlp options
     ydl_opts = {
     'outtmpl': download_path,
