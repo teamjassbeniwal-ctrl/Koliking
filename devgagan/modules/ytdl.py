@@ -7,7 +7,7 @@
 # YouTube: https://youtube.com/@dev_gagan
 # Created: 2025-01-11
 # Last Modified: 2025-03-10
-# Version: 3.0.0
+# Version: 3.0.1
 # License: MIT License
 # ---------------------------------------------------
 
@@ -24,7 +24,7 @@ import math
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from devgagan import app
-from devgagan.utils.func import get_video_metadata, screenshot
+from devgagan.core.func import get_video_metadata, screenshot  # ✅ fixed import
 from devgagantools import fast_upload
 from concurrent.futures import ThreadPoolExecutor
 import aiohttp
