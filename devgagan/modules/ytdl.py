@@ -842,5 +842,4 @@ def format_duration(seconds):
         return f"{hours}:{minutes:02d}:{seconds:02d}"
     else:
         return f"{minutes}:{seconds:02d}"
-```
                   
