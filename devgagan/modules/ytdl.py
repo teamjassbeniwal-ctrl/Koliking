@@ -138,7 +138,7 @@ def progress_callback(done, total, chat_id, user_id):
         f"│ **__Use /cancel to stop__**\n╰────────────────────╯\n\n**__Powered by Team JB__**"
     )
     data['previous_done'] = done
-    data['previous_time'] = time.time()
+    data['previous_time'] = tme.time()
     return text
 
 def format_duration(seconds):
@@ -164,149 +164,102 @@ async def cancel_handler(client: Client, message: Message):
 # -------------------------------------------------------------------
 #  Audio download
 # -------------------------------------------------------------------
-@app.on_message(filters.command("adl"))
-async def adl_handler(client: Client, message: Message):
-    uid = message.from_user.id
-    if ongoing_downloads.get(uid):
-        await message.reply_text("**You already have an ongoing download.**")
+@client.on(events.NewMessage(pattern="/dl"))
+async def handler(event):
+    user_id = event.sender_id
+ 
+     
+    if user_id in ongoing_downloads:
+        await event.reply("**You already have an ongoing ytdlp download. Please wait until it completes!**")
         return
-    if len(message.command) < 2:
-        await message.reply_text("**Usage:** `/adl <link>`")
-        return
-    url = message.command[1]
-
-    if "playlist" in url or "&list=" in url:
-        await message.reply_text("**__Playlist detected – downloading all...__**")
-        await process_audio_playlist(client, message, url)
-        return
-
-    ongoing_downloads[uid] = True
-    cancel_downloads.pop(uid, None)
-
-async def process_audio(client: Client, message: Message, url: str, is_instagram: bool = False):
-    uid = message.from_user.id
-    out_path = None
-    prog_msg = await message.reply_text("**__Starting audio extraction...__**")
-
+ 
+    if len(event.message.text.split()) < 2:
+        await event.reply("**Usage:** `/dl <video-link>`\n\nPlease provide a valid video link!")
+        return    
+ 
+    url = event.message.text.split()[1]
+ 
+     
     try:
-        # --- Cookies ---
-        cookie_file = None
-        if is_instagram:
-            cookie_path = '/app/cookies/instagram.txt'
-            if os.path.exists(cookie_path):
-                cookie_file = cookie_path
+        if "instagram.com" in url:
+            await process_video(client, event, url, "INSTA_COOKIES", check_duration_and_size=False)
+        elif "youtube.com" in url or "youtu.be" in url:
+            await process_video(client, event, url, "YT_COOKIES", check_duration_and_size=True)
         else:
-            cookie_path = '/app/cookies/youtube.txt'
-            if os.path.exists(cookie_path):
-                cookie_file = cookie_path
-
-        # --- Random filename ---
-        random_filename = get_random_string()
-        
-        # --- yt-dlp options ---
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': f"{random_filename}.%(ext)s",
-            'cookiefile': cookie_file if cookie_file else None,
-            'quiet': False,
-            'noplaylist': True,
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web']
-                }
-            },
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0'
-            }
-        }
-
-        # --- Cancel check ---
-        if await check_cancelled(uid):
-            await prog_msg.edit_text("**__Cancelled.__**")
-            return
-
-        # --- Extract audio ---
-        info = await extract_audio_async(ydl_opts, url)
-
-        # ✅ Get actual downloaded file path
-        out_path = info['requested_downloads'][0]['filepath']
-
-        if await check_cancelled(uid):
-            await prog_msg.edit_text("**__Cancelled.__**")
-            return
-
-        # --- Verify file exists ---
-        if not os.path.exists(out_path) or os.path.getsize(out_path) == 0:
-            raise Exception("Downloaded audio file is missing or empty (0 B).")
-
-        # --- Metadata & upload ---
-        title = info.get("title", "Audio")
-        await prog_msg.edit_text("**__Editing metadata...__**")
-
-        def add_metadata():
-            audio = MP3(out_path, ID3=ID3)
-            try:
-                audio.add_tags()
-            except:
-                pass
-            audio.tags["TIT2"] = TIT2(encoding=3, text=title)
-            audio.tags["TPE1"] = TPE1(encoding=3, text="Team SPY")
-            audio.tags["COMM"] = COMM(encoding=3, lang="eng", text="Powered by Team SPY")
-
-            thumb_url = info.get("thumbnail")
-            if thumb_url:
-                thumb_path = os.path.join(tempfile.gettempdir(), f"{get_random_string()}.jpg")
-                try:
-                    r = requests.get(thumb_url, timeout=10)
-                    with open(thumb_path, 'wb') as f:
-                        f.write(r.content)
-                    with open(thumb_path, 'rb') as img:
-                        audio.tags["APIC"] = APIC(
-                            encoding=3,
-                            mime="image/jpeg",
-                            type=3,
-                            data=img.read()
-                        )
-                except Exception as e:
-                    logger.error(f"Thumbnail embedding failed: {e}")
-                finally:
-                    if os.path.exists(thumb_path):
-                        os.remove(thumb_path)
-            audio.save()
-
-        await asyncio.to_thread(add_metadata)
-
-        if await check_cancelled(uid):
-            await prog_msg.edit_text("**__Cancelled.__**")
-            return
-
-        await prog_msg.delete()
-        prog = await client.send_message(message.chat.id, "**__Uploading...__**")
-
-        try:
-            await client.send_audio(
-                chat_id=message.chat.id,
-                audio=out_path,
-                caption=f"**{title}**\n\n__Powered by Team JB__",
-                title=title,
-                performer="Team JB",
-                progress=progress_callback,
-                progress_args=(message.chat.id, uid)
-            )
-        finally:
-            await prog.delete()
-
+            await process_video(client, event, url, None, check_duration_and_size=False)
+ 
     except Exception as e:
-        logger.exception("Audio error")
-        await message.reply_text(f"**__Error: {e}__**")
+        await event.reply(f"**An error occurred:** `{e}`")
     finally:
-        if out_path and os.path.exists(out_path):
-            os.remove(out_path)
+         
+        ongoing_downloads.pop(user_id, None)
+ 
+ 
+ 
+ 
+user_progress = {}
+ 
+def progress_callback(done, total, user_id):
+     
+    if user_id not in user_progress:
+        user_progress[user_id] = {
+            'previous_done': 0,
+            'previous_time': time.time()
+        }
+ 
+     
+    user_data = user_progress[user_id]
+ 
+     
+    percent = (done / total) * 100
+ 
+     
+    completed_blocks = int(percent // 10)
+    remaining_blocks = 10 - completed_blocks
+    progress_bar = "♦" * completed_blocks + "◇" * remaining_blocks
+ 
+     
+    done_mb = done / (1024 * 1024)   
+    total_mb = total / (1024 * 1024)
+ 
+     
+    speed = done - user_data['previous_done']
+    elapsed_time = time.time() - user_data['previous_time']
+ 
+    if elapsed_time > 0:
+        speed_bps = speed / elapsed_time   
+        speed_mbps = (speed_bps * 8) / (1024 * 1024)   
+    else:
+        speed_mbps = 0
+ 
+     
+    if speed_bps > 0:
+        remaining_time = (total - done) / speed_bps
+    else:
+        remaining_time = 0
+ 
+     
+    remaining_time_min = remaining_time / 60
+ 
+     
+    final = (
+        f"╭──────────────────╮\n"
+        f"│        **__Uploading...__**       \n"
+        f"├──────────\n"
+        f"│ {progress_bar}\n\n"
+        f"│ **__Progress:__** {percent:.2f}%\n"
+        f"│ **__Done:__** {done_mb:.2f} MB / {total_mb:.2f} MB\n"
+        f"│ **__Speed:__** {speed_mbps:.2f} Mbps\n"
+        f"│ **__Time Remaining:__** {remaining_time_min:.2f} min\n"
+        f"╰──────────────────╯\n\n"
+        f"**__Powered by Team JB__**"
+    )
+ 
+     
+    user_data['previous_done'] = done
+    user_data['previous_time'] = time.time()
+ 
+    return final
     
 async def process_audio_playlist(client, message, url):
     uid = message.from_user.id
