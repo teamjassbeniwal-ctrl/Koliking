@@ -2,7 +2,7 @@
 # File Name: ytdl.py (Pyrogram-only, self-contained)
 # Description: Download videos/audio from YouTube & other sites
 # Author: Gagan
-# Version: 4.0.0
+# Version: 4.0.1
 # License: MIT
 # ---------------------------------------------------
 
@@ -622,4 +622,3 @@ def time_formatter(ms):
     if s: parts.append(f"{s}s")
     if ms and not parts: parts.append(f"{ms}ms")
     return ' '.join(parts) if parts else "0s"
-    
