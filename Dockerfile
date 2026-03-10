@@ -1,40 +1,34 @@
 # Use a maintained base image
+# Use maintained Python image
 FROM python:3.10-slim-bookworm
 
-# Prevent interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
-
-# Update system & install dependencies
-RUN apt update && apt upgrade -y && \
-    apt install -y \
-        git \
-        curl \
-        python3-pip \
-        ffmpeg \
-        wget \
-        bash \
-        neofetch \
-        ca-certificates \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-        software-properties-common && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Copy requirements and install Python packages
-COPY requirements.txt .
-
-RUN pip3 install --no-cache-dir wheel && \
-    pip3 install --no-cache-dir -r requirements.txt
-
-# Set working directory
 WORKDIR /app
 
-# Copy your app code
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    ffmpeg \
+    wget \
+    bash \
+    neofetch \
+    ca-certificates \
+    software-properties-common \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install python packages
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy project
 COPY . .
 
-# Expose Flask app port
+# Expose port (if using flask)
 EXPOSE 5000
 
-# Run Flask + Python module
-CMD flask run -h 0.0.0.0 -p 5000 & python3 -m devgagan
+# Start application
+CMD ["bash", "-c", "flask run -h 0.0.0.0 -p 5000 & python3 -m devgagan"]
