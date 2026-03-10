@@ -168,7 +168,7 @@ def format_duration(seconds):
 # -------------------------------------------------------------------
 #  Cancel command
 # -------------------------------------------------------------------
-@app.on_message(filters.command("cancel"))
+@app.on_message(filters.command("dcancel"))
 async def cancel_handler(client: Client, message: Message):
     uid = message.from_user.id
     if ongoing_downloads.get(uid):
@@ -222,7 +222,6 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
             f.write(cookies)
             temp_cookie = f.name
 
-    fname = f"@team_spy_pro_{uid}"
     out_path = f"{fname}.mp3"
     # ADD THIS LINE
     random_filename = get_random_string()
@@ -235,6 +234,11 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     'noplaylist': True,
     'js_runtimes': {'node': {}},
     'remote_components': ['ejs:github'],
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
     'extractor_args': {
         'youtube': {
             'player_client': ['android', 'web']
@@ -283,7 +287,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
                 thumb_url = info.get("thumbnail")
 
                 if thumb_url:
-                    thumb_path = os.path.join(tempfile.gettempdir(), "thumb.jpg")
+                    thumb_path = os.path.join(tempfile.gettempdir(), f"{get_random_string()}.jpg")
 
                     import requests
                     r = requests.get(thumb_url)
@@ -323,9 +327,9 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
                 await client.send_audio(
                     chat_id=message.chat.id,
                     audio=out_path,
-                    caption=f"**{title}**\n\n__Powered by Team SPY__",
+                    caption=f"**{title}**\n\n__Powered by Team JB__",
                     title=title,
-                    performer="Team SPY",
+                    performer="Team JB",
                     progress=progress_callback,
                     progress_args=(message.chat.id, uid)
                 )
