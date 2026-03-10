@@ -388,7 +388,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     # Improved yt-dlp options for YouTube
     ydl_opts = {
         'outtmpl': out_path + '.%(ext)s',   # let yt-dlp add extension
-        'format': 'best',                    # best format, any container
+        'format': 'bv*+ba/b'                    # best format, any container
         'cookiefile': '/app/cookies/youtube.txt',
         'writethumbnail': True,
         'verbose': True,
