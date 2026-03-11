@@ -42,6 +42,7 @@ cancel_downloads = {}  # Track cancellation requests
 
 interval_set = {}
 users_loop = {}
+last_edit = {}
 
 # -------------------------------------------------------------------
 #  Self‑contained helper functions
@@ -170,19 +171,15 @@ async def fetch_video_info(url, ydl_opts, progress_message, check_duration_and_s
                 return None
         return info
 
- last_edit = {}
-
 def download_progress_hook(d, prog_msg, loop):
     if d['status'] != 'downloading':
         return
 
     downloaded = d.get('downloaded_bytes', 0)
     total = d.get('total_bytes') or d.get('total_bytes_estimate') or 1
-
     percent = downloaded / total * 100
     blocks = int(percent // 10)
     bar = "♦" * blocks + "◇" * (10 - blocks)
-
     done_mb = downloaded / 1048576
     total_mb = total / 1048576
     speed = d.get('speed', 0) or 0
@@ -205,17 +202,13 @@ def download_progress_hook(d, prog_msg, loop):
 
     chat_id = prog_msg.chat.id
     now = time.time()
-
     if chat_id not in last_edit:
         last_edit[chat_id] = 0
-
     if now - last_edit[chat_id] < 2:  # update every 2 sec
         return
     last_edit[chat_id] = now
-
-    # Schedule message edit in main loop
     asyncio.run_coroutine_threadsafe(prog_msg.edit_text(text), loop)
-    
+ 
 # Progress callback for fast_upload
 upload_last_edit = {}
 upload_data = {}
