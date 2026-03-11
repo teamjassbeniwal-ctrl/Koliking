@@ -205,7 +205,7 @@ def download_progress_hook(d, msg):
         last_edit[chat_id] = 0
 
     # only update every 2 seconds
-    if now - last_edit[chat_id] < 2:
+    if now - last_edit[chat_id] < 3:
         return
 
     last_edit[chat_id] = now
@@ -368,6 +368,9 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
             temp_cookie = f.name
 
     random_filename = get_random_string()
+
+    prog_msg = await message.reply_text("**__Starting audio extraction...__**")
+    
     ydl_opts = {
     'format': 'bestaudio/best',
     'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
@@ -391,7 +394,6 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
         'User-Agent': 'Mozilla/5.0'
     }
     }
-    prog_msg = await message.reply_text("**__Starting audio extraction...__**")
 
     try:
         if await check_cancelled(uid):
@@ -580,6 +582,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     out_name = get_random_string()
     download_path = os.path.join(DOWNLOAD_DIR, f"{out_name}.%(ext)s")
 
+    prog_msg = await message.reply_text("**Starting download...**")
     # yt-dlp options
     ydl_opts = {
         'outtmpl': download_path,
@@ -596,8 +599,6 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
         },
         'http_headers': {'User-Agent': 'Mozilla/5.0'}
     }
-
-    prog_msg = await message.reply_text("**Starting download...**")
 
     try:
         if await check_cancelled(uid):
