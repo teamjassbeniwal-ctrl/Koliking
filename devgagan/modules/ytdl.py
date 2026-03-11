@@ -629,7 +629,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     'outtmpl': download_path,
     'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
     'merge_output_format': 'mp4',
-    'cookiefile': temp_cookie if cookies else None,   # use temp cookie if provided
+    'cookiefile': '/app/cookies/youtube.txt',  # use temp cookie if provided
     'writethumbnail': True,
     'noplaylist': True,
     'quiet': True,
