@@ -159,48 +159,92 @@ async def fetch_video_info(url, ydl_opts, progress_message, check_duration_and_s
                 return None
         return info
 
+
 def download_progress_hook(d, msg):
-    if d['status'] == 'downloading':
-        percent = d.get('_percent_str', '0%')
-        speed = d.get('_speed_str', '')
-        eta = d.get('_eta_str', '')
+    if d['status'] != 'downloading':
+        return
 
-        text = f"⬇ Downloading\n\n{percent}\n⚡ {speed}\n⏳ ETA {eta}"
+    downloaded = d.get('downloaded_bytes', 0)
+    total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
 
-        try:
-            asyncio.run_coroutine_threadsafe(
-                msg.edit_text(text),
-                asyncio.get_event_loop()
-            )
-        except:
-            pass
+    if total == 0:
+        return
 
+    percent = downloaded / total * 100
+    speed = d.get('speed', 0)
+    eta = d.get('eta', 0)
+
+    done = downloaded / 1048576
+    total_mb = total / 1048576
+    speed_mb = speed / 1048576 if speed else 0
+
+    bar_filled = int(percent // 10)
+    bar = "♦" * bar_filled + "◇" * (10 - bar_filled)
+
+    text = (
+        "╭──────────────╮\n"
+        "│ Downloading...\n"
+        "├──────────────\n"
+        f"│ {bar}\n\n"
+        f"│ Completed: {done:.1f} MB/{total_mb:.2f} MB\n"
+        f"│ Bytes: {percent:.2f}%\n"
+        f"│ Speed: {speed_mb:.2f} MB/s\n"
+        f"│ ETA: {int(eta//60)}m {int(eta%60)}s\n"
+        "╰─────────────────────╯"
+    )
+
+    try:
+        asyncio.run_coroutine_threadsafe(
+            msg.edit_text(text),
+            asyncio.get_event_loop()
+        )
+    except:
+        pass
 # Progress callback for fast_upload
 user_progress = {}
 def progress_callback(done, total, chat_id, user_id):
     if user_id in cancel_downloads and cancel_downloads[user_id]:
-        raise Exception("Download cancelled by user")
+        raise Exception("Upload cancelled by user")
+
     if chat_id not in user_progress:
-        user_progress[chat_id] = {'previous_done': 0, 'previous_time': time.time()}
+        user_progress[chat_id] = {
+            'previous_done': 0,
+            'previous_time': time.time()
+        }
+
     data = user_progress[chat_id]
+
     percent = (done / total) * 100
     blocks = int(percent // 10)
-    bar = "█" * blocks + "░" * (10 - blocks)
+    bar = "♦" * blocks + "◇" * (10 - blocks)
+
     done_mb = done / 1048576
     total_mb = total / 1048576
+
     speed = done - data['previous_done']
     elapsed = time.time() - data['previous_time']
-    speed_mbps = (speed / elapsed * 8) / 1048576 if elapsed > 0 else 0
+
+    speed_mb = (speed / elapsed) / 1048576 if elapsed > 0 else 0
     remaining = (total - done) / (speed / elapsed) if speed > 0 else 0
-    rem_min = remaining / 60
+
+    eta_m = int(remaining // 60)
+    eta_s = int(remaining % 60)
+
     text = (
-        f"╭────────────────────╮\n│    **__Uploading...__**   │\n├────────────────────┤\n│ {bar}\n\n"
-        f"│ **__Progress:__** {percent:.2f}%\n│ **__Done:__** {done_mb:.2f} MB / {total_mb:.2f} MB\n"
-        f"│ **__Speed:__** {speed_mbps:.2f} Mbps\n│ **__Time Remaining:__** {rem_min:.2f} min\n"
-        f"│ **__Use /cancel to stop__**\n╰────────────────────╯\n\n**__Powered by Team JB__**"
+        "╭──────────────╮\n"
+        "│ Pyro Uploader\n"
+        "├──────────────\n"
+        f"│ {bar}\n\n"
+        f"│ Completed: {done_mb:.1f} MB/{total_mb:.2f} MB\n"
+        f"│ Bytes: {percent:.2f}%\n"
+        f"│ Speed: {speed_mb:.2f} MB/s\n"
+        f"│ ETA: {eta_m}m, {eta_s}s\n"
+        "╰─────────────────────╯"
     )
+
     data['previous_done'] = done
     data['previous_time'] = time.time()
+
     return text
 
 def format_duration(seconds):
