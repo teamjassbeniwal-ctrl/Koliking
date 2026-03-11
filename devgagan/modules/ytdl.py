@@ -351,31 +351,28 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
 
     random_filename = get_random_string()
     ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
-        'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
-        'cookiefile': cookie_file,
-        'quiet': True,
-        'no_warnings': True,
-        'noplaylist': True,
-        'progress_hooks': [lambda d: download_progress_hook(d, prog_msg, loop)],
-        'retries': 10,
-        'fragment_retries': 10,
-        'skip_unavailable_fragments': True,
-        'ignoreerrors': True,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'prefer_ffmpeg': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'web', 'ios']
-            }
-        },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    'format': 'bestvideo+bestaudio/best',
+    'outtmpl': download_path,
+    'cookiefile': cookie_file,
+
+    'quiet': True,
+    'no_warnings': True,
+
+    'retries': 10,
+    'fragment_retries': 10,
+    'concurrent_fragment_downloads': 5,
+
+    'source_address': '0.0.0.0',
+
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web', 'tv']
         }
+    },
+
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/133 Safari/537.36'
+    }
     }
 
     try:
