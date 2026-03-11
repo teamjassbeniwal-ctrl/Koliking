@@ -135,12 +135,23 @@ async def screenshot(file_path, duration, user_id):
         logger.error(f"Screenshot failed: {e}")
     return None
 
-async def extract_audio_async(ydl_opts, url):
+async def extract_audio_async(ydl_opts, url, prog_msg):
+    """
+    Async wrapper for yt-dlp audio extraction with progress updates.
+    """
+    loop = asyncio.get_running_loop()  # get the main loop
+
+    # Add progress hook that can edit the message safely
+    ydl_opts['progress_hooks'] = [lambda d: download_progress_hook(d, prog_msg, loop)]
+
+    # Synchronous extraction (yt-dlp is blocking)
     def sync_extract():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             return ydl.extract_info(url, download=True)
-    return await asyncio.get_event_loop().run_in_executor(thread_pool, sync_extract)
 
+    # Run in thread pool to avoid blocking
+    return await asyncio.get_event_loop().run_in_executor(thread_pool, sync_extract)
+    
 def download_video(url, ydl_opts):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
@@ -159,10 +170,9 @@ async def fetch_video_info(url, ydl_opts, progress_message, check_duration_and_s
                 return None
         return info
 
-last_edit = {}
+ last_edit = {}
 
-def download_progress_hook(d, msg):
-
+def download_progress_hook(d, prog_msg, loop):
     if d['status'] != 'downloading':
         return
 
@@ -170,18 +180,14 @@ def download_progress_hook(d, msg):
     total = d.get('total_bytes') or d.get('total_bytes_estimate') or 1
 
     percent = downloaded / total * 100
-
     blocks = int(percent // 10)
     bar = "♦" * blocks + "◇" * (10 - blocks)
 
     done_mb = downloaded / 1048576
     total_mb = total / 1048576
-
     speed = d.get('speed', 0) or 0
     eta = d.get('eta', 0) or 0
-
     speed_mb = speed / 1048576
-
     eta_m = int(eta // 60)
     eta_s = int(eta % 60)
 
@@ -197,26 +203,19 @@ def download_progress_hook(d, msg):
         "╰─────────────────────╯"
     )
 
-    chat_id = msg.chat.id
+    chat_id = prog_msg.chat.id
     now = time.time()
 
     if chat_id not in last_edit:
         last_edit[chat_id] = 0
 
-    if now - last_edit[chat_id] < 3:
+    if now - last_edit[chat_id] < 2:  # update every 2 sec
         return
-
     last_edit[chat_id] = now
 
-    try:
-        loop = asyncio.get_event_loop()
-        asyncio.run_coroutine_threadsafe(
-            msg.edit_text(text),
-            loop
-        )
-    except:
-        pass
-        
+    # Schedule message edit in main loop
+    asyncio.run_coroutine_threadsafe(prog_msg.edit_text(text), loop)
+    
 # Progress callback for fast_upload
 upload_last_edit = {}
 upload_data = {}
@@ -371,6 +370,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     random_filename = get_random_string()
 
     prog_msg = await message.reply_text("**__Starting audio extraction...__**")
+    loop = asyncio.get_running_loop()  # get loop
     
     ydl_opts = {
     'format': 'bestaudio/best',
@@ -379,7 +379,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     'quiet': True,
     'no_warnings': True,
     'noplaylist': True,
-    'progress_hooks': [lambda d: download_progress_hook(d, prog_msg)],
+    'progress_hooks': [lambda d: download_progress_hook(d, prog_msg, loop)],
     'js_runtimes': {'node': {}},
     'remote_components': ['ejs:github'],
     'postprocessors': [{
@@ -585,6 +585,8 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     download_path = os.path.join(DOWNLOAD_DIR, f"{out_name}.%(ext)s")
 
     prog_msg = await message.reply_text("**Starting download...**")
+    loop = asyncio.get_running_loop()
+                    
     # yt-dlp options
     ydl_opts = {
         'outtmpl': download_path,
@@ -595,7 +597,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
-        'progress_hooks': [lambda d: download_progress_hook(d, prog_msg)],
+        'progress_hooks': [lambda d: download_progress_hook(d, prog_msg, loop)],
         'js_runtimes': {'node': {}},
         'remote_components': ['ejs:github'],
         'extractor_args': {
