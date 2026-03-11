@@ -161,47 +161,38 @@ async def fetch_video_info(url, ydl_opts, progress_message, check_duration_and_s
 
 def download_progress_hook(d, msg):
     if d['status'] == 'downloading':
+        percent = d.get('_percent_str', '0%')
+        speed = d.get('_speed_str', '0')
+        eta = d.get('_eta_str', '0')
 
-        total = d.get('total_bytes') or d.get('total_bytes_estimate')
         downloaded = d.get('downloaded_bytes', 0)
-        speed = d.get('speed', 0)
-        eta = d.get('eta')
+        total = d.get('total_bytes') or d.get('total_bytes_estimate', 1)
 
-        percent = (downloaded / total * 100) if total else 0
+        percent_float = downloaded / total * 100
 
-        blocks = int(percent // 10)
+        blocks = int(percent_float // 10)
         bar = "♦" * blocks + "◇" * (10 - blocks)
 
         done_mb = downloaded / 1048576
-        total_mb = total / 1048576 if total else 0
-        speed_mb = speed / 1048576 if speed else 0
-
-        # SAFE ETA
-        if eta is None:
-            eta_text = "Calculating..."
-        else:
-            eta_text = f"{int(eta//60)}m {int(eta%60)}s"
+        total_mb = total / 1048576
 
         text = (
             "╭──────────────╮\n"
             "│ Downloading...\n"
             "├──────────────\n"
             f"│ {bar}\n\n"
-            f"│ Completed: {done_mb:.1f} MB/{total_mb:.2f} MB\n"
-            f"│ Bytes: {percent:.2f}%\n"
-            f"│ Speed: {speed_mb:.2f} MB/s\n"
-            f"│ ETA: {eta_text}\n"
+            f"│ Completed: {done_mb:.2f} MB/{total_mb:.2f} MB\n"
+            f"│ Bytes: {percent}\n"
+            f"│ Speed: {speed}\n"
+            f"│ ETA: {eta}\n"
             "╰─────────────────────╯"
         )
 
-        try:
-            asyncio.run_coroutine_threadsafe(
-                msg.edit_text(text),
-                asyncio.get_event_loop()
-            )
-        except:
-            pass
-
+        asyncio.run_coroutine_threadsafe(
+            msg.edit_text(text),
+            asyncio.get_event_loop()
+        )
+        
 # Progress callback for fast_upload
 user_progress = {}
 upload_data = {}
