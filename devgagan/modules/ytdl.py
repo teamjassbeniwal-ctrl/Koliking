@@ -160,13 +160,15 @@ async def fetch_video_info(url, ydl_opts, progress_message, check_duration_and_s
         return info
 
 def download_progress_hook(d, msg):
+
     if d['status'] == 'downloading':
+
         percent = d.get('_percent_str', '0%')
         speed = d.get('_speed_str', '0')
         eta = d.get('_eta_str', '0')
 
         downloaded = d.get('downloaded_bytes', 0)
-        total = d.get('total_bytes') or d.get('total_bytes_estimate', 1)
+        total = d.get('total_bytes') or d.get('total_bytes_estimate') or 1
 
         percent_float = downloaded / total * 100
 
@@ -188,10 +190,11 @@ def download_progress_hook(d, msg):
             "╰─────────────────────╯"
         )
 
-        asyncio.run_coroutine_threadsafe(
-            msg.edit_text(text),
-            asyncio.get_event_loop()
-        )
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(msg.edit_text(text))
+        except RuntimeError:
+            pass
         
 # Progress callback for fast_upload
 user_progress = {}
@@ -317,7 +320,7 @@ async def adl_handler(client: Client, message: Message):
 # ---------------- process audio ----------------
 async def process_audio(client: Client, message: Message, url: str, cookies_env_var=None):
     uid = message.from_user.id
-
+    out_path = None
     # Playlist handling
     if "playlist" in url or "&list=" in url:
         await message.reply_text("**__Playlist detected – downloading all...__**")
