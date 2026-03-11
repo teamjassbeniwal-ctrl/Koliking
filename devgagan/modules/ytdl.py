@@ -157,18 +157,30 @@ async def extract_audio_async(ydl_opts, url, prog_msg):
     """
     Async wrapper for yt-dlp audio extraction with progress updates.
     """
-    loop = asyncio.get_running_loop()  # get the main loop
+    loop = asyncio.get_running_loop()
 
-    # Add progress hook that can edit the message safely
-    ydl_opts['progress_hooks'] = [lambda d: download_progress_hook(d, prog_msg, loop)]
+    # Add progress hook
+    ydl_opts['progress_hooks'] = [
+        lambda d: download_progress_hook(d, prog_msg, loop)
+    ]
 
-    # Synchronous extraction (yt-dlp is blocking)
     def sync_extract():
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            return ydl.extract_info(url, download=True)
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(url, download=True)
+        except Exception as e:
+            return {"error": str(e)}
 
-    # Run in thread pool to avoid blocking
-    return await asyncio.get_event_loop().run_in_executor(thread_pool, sync_extract)
+    # Run blocking yt-dlp in thread pool
+    info = await loop.run_in_executor(thread_pool, sync_extract)
+
+    # Handle extraction error
+    if not info or "error" in info:
+        err = info.get("error", "Unknown error") if isinstance(info, dict) else "Unknown error"
+        await prog_msg.edit_text(f"❌ **Audio extraction failed:**\n`{err}`")
+        return None
+
+    return info
     
 def download_video(url, ydl_opts):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -383,7 +395,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     loop = asyncio.get_running_loop()  # get loop
     
     ydl_opts = {
-    'format': 'bestaudio[ext=m4a]/bestaudio/best',
+    'format': 'bestaudio/best',
     'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
     'cookiefile': '/app/cookies/youtube.txt',
 
@@ -432,7 +444,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
 
         # Get actual MP3 path
         out_path = None
-        if 'requested_downloads' in info and info['requested_downloads']:
+        if info and 'requested_downloads' in info and info['requested_downloads']:
             out_path = info['requested_downloads'][0].get('filepath')
 
         if not out_path or not os.path.exists(out_path):
@@ -611,7 +623,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     # yt-dlp options
     ydl_opts = {
     'outtmpl': download_path,
-    'format': 'bv*+ba/b',
+    'format': 'bestvideo+bestaudio/best',
     'cookiefile': '/app/cookies/youtube.txt',
 
     'writethumbnail': True,
