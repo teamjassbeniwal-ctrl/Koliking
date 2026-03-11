@@ -624,8 +624,8 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     # yt-dlp options
     ydl_opts = {
     'outtmpl': download_path,
-    'format': 'bestvideo*+bestaudio/best'  # keep this for video+aud
-    'merge_output_format': 'mp4',   
+    'format': 'bestvideo*+bestaudio/best'
+    'merge_output_format': 'mp4',   # keep this for video+aud  
     'cookiefile': '/app/cookies/youtube.txt',
 
     'writethumbnail': True,
