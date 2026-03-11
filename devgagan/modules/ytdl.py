@@ -467,8 +467,9 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
                 title=title,
                 performer="Team JB",
                 progress=progress_bar,
-                progress_args=(message.chat.id, uid)
+                progress_args=("Uploading Audio", prog, time.time(), uid)
             )
+            
         finally:
             await prog.delete()
 
@@ -685,7 +686,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
                     height=height,
                     thumb=thumb if thumb and os.path.exists(thumb) else None,
                     progress=progress_bar,
-                    progress_args=(chat, uid)
+                    progress_args=("Uploading Audio", prog, time.time(), uid)
                 )
             finally:
                 await prog.delete()
