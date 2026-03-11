@@ -396,16 +396,15 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     
     ydl_opts = {
     'format': 'bestaudio/best',
+
     'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
     'cookiefile': '/app/cookies/youtube.txt',
+
     'quiet': True,
     'no_warnings': True,
     'noplaylist': True,
 
     'progress_hooks': [lambda d: download_progress_hook(d, prog_msg, loop)],
-
-    'js_runtimes': {'node': {}},
-    'remote_components': ['ejs:github'],
 
     'retries': 10,
     'fragment_retries': 10,
@@ -418,16 +417,18 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
         'preferredquality': '192',
     }],
 
+    'prefer_ffmpeg': True,   # ⭐ important
+
     'extractor_args': {
         'youtube': {
-            'player_client': ['android']   # FIXED
+            'player_client': ['android']
         }
     },
 
     'http_headers': {
         'User-Agent': 'Mozilla/5.0'
     }
-    } 
+    }
 
     try:
         if await check_cancelled(uid):
@@ -443,9 +444,11 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
 
         # Get actual MP3 path
         out_path = None
-        if info and 'requested_downloads' in info and info['requested_downloads']:
-            out_path = info['requested_downloads'][0].get('filepath')
-
+        for f in os.listdir(DOWNLOAD_DIR):
+            if f.startswith(random_filename) and f.endswith(".mp3"):
+                out_path = os.path.join(DOWNLOAD_DIR, f)
+                break
+                
         if not out_path or not os.path.exists(out_path):
             await prog_msg.edit_text("**__Audio file missing!__**")
             return
@@ -566,7 +569,6 @@ async def dl_handler(client: Client, message: Message):
         return
 
     freecheck = await chk_user(message, uid)
-
     can, msg = await check_interval(uid, freecheck)
 
     if not can:
@@ -586,7 +588,11 @@ async def dl_handler(client: Client, message: Message):
 
     try:
 
-        if "instagram.com" in url:
+        # ✅ FIXED BLOCK
+        if "playlist" in url or "&list=" in url:
+            await process_video_playlist(client, message, url, "YT_COOKIES")
+
+        elif "instagram.com" in url:
             await process_video(client, message, url, "INSTA_COOKIES", False)
 
         elif "youtube.com" in url or "youtu.be" in url:
@@ -595,7 +601,6 @@ async def dl_handler(client: Client, message: Message):
         else:
             await process_video(client, message, url, None, False)
 
-        # Set cooldown for free users
         if freecheck == 1:
             await set_interval(uid, 15)
 
@@ -622,11 +627,13 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     # yt-dlp options
     ydl_opts = {
     'outtmpl': download_path,
-    'format': 'bv*+ba/b',
+
+    'format': 'bestvideo+bestaudio/best',
+    'merge_output_format': 'mp4',
+
     'cookiefile': '/app/cookies/youtube.txt',
 
     'writethumbnail': True,
-    'verbose': True,
     'noplaylist': True,
 
     'quiet': True,
@@ -739,7 +746,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
                     height=height,
                     thumb=thumb if thumb and os.path.exists(thumb) else None,
                     progress=progress_bar,
-                    progress_args=("Uploading Audio", prog, time.time(), uid)
+                    progress_args=("Uploading Video", prog, time.time(), uid)
                 )
             finally:
                 await prog.delete()
