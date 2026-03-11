@@ -266,7 +266,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     if "playlist" in url or "&list=" in url:
         await message.reply_text("**__Playlist detected – downloading all...__**")
         # implement process_audio_playlist if needed
-        return
+        return await process_audio_playlist(client, message, url, cookies_env_var)
 
     cookies = cookies_env_var if cookies_env_var else None
     temp_cookie = None
@@ -415,6 +415,7 @@ async def process_audio_playlist(client, message, url, cookies_env_var):
                 fail += 1
                 logger.error(f"Failed {vid_url}: {e}")
             await prog.edit_text(f"**__Progress: {good}/{total} downloaded, {fail} failed.__**")
+            await asyncio.sleep(1)   # ← add this line
         await message.reply_text(f"**__Playlist done! Success: {good}, Failed: {fail}__**")
     except Exception as e:
         await message.reply_text(f"**__Error: {e}__**")
