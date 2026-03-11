@@ -159,6 +159,22 @@ async def fetch_video_info(url, ydl_opts, progress_message, check_duration_and_s
                 return None
         return info
 
+def download_progress_hook(d, msg):
+    if d['status'] == 'downloading':
+        percent = d.get('_percent_str', '0%')
+        speed = d.get('_speed_str', '')
+        eta = d.get('_eta_str', '')
+
+        text = f"⬇ Downloading\n\n{percent}\n⚡ {speed}\n⏳ ETA {eta}"
+
+        try:
+            asyncio.run_coroutine_threadsafe(
+                msg.edit_text(text),
+                asyncio.get_event_loop()
+            )
+        except:
+            pass
+
 # Progress callback for fast_upload
 user_progress = {}
 def progress_callback(done, total, chat_id, user_id):
@@ -283,6 +299,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     'cookiefile': '/app/cookies/youtube.txt',
     'quiet': False,
     'noplaylist': True,
+    'progress_hooks': [lambda d: download_progress_hook(d, prog_msg)],
     'js_runtimes': {'node': {}},
     'remote_components': ['ejs:github'],
     'postprocessors': [{
@@ -495,6 +512,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
         'writethumbnail': True,
         'verbose': True,
         'noplaylist': True,
+        'progress_hooks': [lambda d: download_progress_hook(d, prog_msg)],
         'js_runtimes': {'node': {}},
         'remote_components': ['ejs:github'],
         'extractor_args': {
