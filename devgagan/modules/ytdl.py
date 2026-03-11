@@ -383,7 +383,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     loop = asyncio.get_running_loop()  # get loop
     
     ydl_opts = {
-    'format': 'bestaudio/best',
+    'format': 'bestaudio[ext=m4a]/bestaudio/best',
     'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
     'cookiefile': '/app/cookies/youtube.txt',
     'quiet': True,
