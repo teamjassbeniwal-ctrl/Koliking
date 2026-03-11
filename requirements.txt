@@ -20,3 +20,4 @@ telethon-tgcrypto
 mutagen
 yt-dlp>=2026.03.03
 speedtest-cli
+brotli
