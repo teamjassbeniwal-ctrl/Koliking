@@ -42,11 +42,28 @@ cancel_downloads = {}  # Track cancellation requests
 
 interval_set = {}
 users_loop = {}
-last_edit = {}
 
 # -------------------------------------------------------------------
 #  Self‑contained helper functions
 # -------------------------------------------------------------------
+last_edit = {}
+
+async def edit_progress(message, text):
+    import time
+    now = time.time()
+
+    # Wait 5 seconds between edits to avoid Telegram flood errors
+    last = last_edit.get(message.id, 0)
+    if now - last < 5:
+        return
+
+    last_edit[message.id] = now
+
+    try:
+        await message.edit(text)
+    except:
+        pass
+        
 # Check if user can proceed
 async def check_interval(user_id, freecheck):
     if freecheck != 1 or await is_user_verified(user_id):  # Premium or verified users
