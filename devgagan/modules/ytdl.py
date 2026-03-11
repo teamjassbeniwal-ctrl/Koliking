@@ -207,7 +207,7 @@ def download_progress_hook(d, prog_msg, loop):
     if now - last_edit[chat_id] < 2:  # update every 2 sec
         return
     last_edit[chat_id] = now
-    loop.create_task(prog_msg.edit_text(text))
+    asyncio.run_coroutine_threadsafe(edit_progress(prog_msg, text), loop)
     
 # Progress callback for fast_upload
 upload_last_edit = {}
