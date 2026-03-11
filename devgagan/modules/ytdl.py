@@ -434,7 +434,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
                 caption=f"**{title}**\n\n__Powered by Team JB__",
                 title=title,
                 performer="Team JB",
-                progress=progress_callback,
+                progress=progress_bar,
                 progress_args=(message.chat.id, uid)
             )
         finally:
@@ -652,7 +652,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
                     width=width,
                     height=height,
                     thumb=thumb if thumb and os.path.exists(thumb) else None,
-                    progress=progress_callback,
+                    progress=progress_bar,
                     progress_args=(chat, uid)
                 )
             finally:
