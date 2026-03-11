@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     git \
     curl \
     ffmpeg \
+    aria2 \
     wget \
     bash \
     ca-certificates \
@@ -27,11 +28,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
-# Create cookies folder (important for yt-dlp)
+# Create required folders
 RUN mkdir -p /app/cookies
+RUN mkdir -p /app/downloads
 
-# Expose port for Flask health check
+# Expose port
 EXPOSE 5000
 
-# Start both Flask + bot
 CMD bash -c "flask run -h 0.0.0.0 -p 5000 & python3 -m devgagan"
