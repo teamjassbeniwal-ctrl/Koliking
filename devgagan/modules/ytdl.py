@@ -819,27 +819,39 @@ async def split_and_upload_file(client, chat_id, file_path, caption, user_id):
     os.remove(file_path)
 
 async def progress_bar(current, total, ud_type, message, start, user_id):
+
     if await check_cancelled(user_id):
         raise Exception("Upload cancelled")
+
     now = time.time()
     diff = now - start
-    if round(diff % 10) == 0 or current == total:
-        pct = (current / total) * 100
-        speed = current / diff if diff else 0
-        elapsed = round(diff * 1000)
-        eta = round((total - current) / speed) * 1000 if speed else 0
-        total_time = elapsed + eta
-        progress = "█" * (int(pct)//10) + "░" * (10 - int(pct)//10)
-        txt = (
-            f"╭────────────────────╮\n│    **{ud_type}**   │\n├────────────────────┤\n│ {progress}\n\n"
-            f"Completed: {humanbytes(current)}/{humanbytes(total)}\nBytes: {pct:.2f}%\n"
-            f"Speed: {humanbytes(speed)}/s\nETA: {time_formatter(eta)}\n"
-            f"│ **__Use /cancel to stop__**\n╰────────────────────╯"
-        )
-        try:
-            await message.edit_text(txt)
-        except:
-            pass
+
+    if diff < 2 and current != total:
+        return
+
+    pct = current / total * 100
+    speed = current / diff if diff else 0
+    eta = (total - current) / speed if speed else 0
+
+    blocks = int(pct // 10)
+    progress = "♦" * blocks + "◇" * (10 - blocks)
+
+    txt = (
+        f"╭──────────────╮\n"
+        f"│ {ud_type}\n"
+        f"├──────────────\n"
+        f"│ {progress}\n\n"
+        f"│ Completed: {humanbytes(current)}/{humanbytes(total)}\n"
+        f"│ Bytes: {pct:.2f}%\n"
+        f"│ Speed: {humanbytes(speed)}/s\n"
+        f"│ ETA: {time_formatter(int(eta*1000))}\n"
+        f"╰─────────────────────╯"
+    )
+
+    try:
+        await message.edit_text(txt)
+    except:
+        pass
 
 def humanbytes(size):
     if not size: return ""
