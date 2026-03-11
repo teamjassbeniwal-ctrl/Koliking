@@ -627,35 +627,24 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     # yt-dlp options
     ydl_opts = {
     'outtmpl': download_path,
-
-    'format': 'bestvideo+bestaudio/best',
+    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
     'merge_output_format': 'mp4',
-
-    'cookiefile': '/app/cookies/youtube.txt',
-
+    'cookiefile': temp_cookie if cookies else None,   # use temp cookie if provided
     'writethumbnail': True,
     'noplaylist': True,
-
     'quiet': True,
     'no_warnings': True,
-
     'progress_hooks': [lambda d: download_progress_hook(d, prog_msg, loop)],
-
-    'js_runtimes': {'node': {}},
-    'remote_components': ['ejs:github'],
-
     'retries': 10,
     'fragment_retries': 10,
     'skip_unavailable_fragments': True,
-
     'extractor_args': {
         'youtube': {
-            'player_client': ['android']   # FIXED
+            'player_client': ['android', 'web']
         }
     },
-
     'http_headers': {
-        'User-Agent': 'Mozilla/5.0'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     }
     }
 
