@@ -386,26 +386,37 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     'format': 'bestaudio[ext=m4a]/bestaudio/best',
     'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
     'cookiefile': '/app/cookies/youtube.txt',
+
     'quiet': True,
     'no_warnings': True,
     'noplaylist': True,
+
     'progress_hooks': [lambda d: download_progress_hook(d, prog_msg, loop)],
+
     'js_runtimes': {'node': {}},
     'remote_components': ['ejs:github'],
+
+    'retries': 10,
+    'fragment_retries': 10,
+    'skip_unavailable_fragments': True,
+    'ignoreerrors': True,
+
     'postprocessors': [{
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'mp3',
         'preferredquality': '192',
     }],
+
     'extractor_args': {
         'youtube': {
-            'player_client': ['android', 'web']
+            'player_client': ['android']   # FIXED
         }
     },
+
     'http_headers': {
         'User-Agent': 'Mozilla/5.0'
     }
-    }
+    } 
 
     try:
         if await check_cancelled(uid):
@@ -599,21 +610,35 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
                     
     # yt-dlp options
     ydl_opts = {
-        'outtmpl': download_path,
-        'format': 'bv*+ba/b',
-        'cookiefile': '/app/cookies/youtube.txt',
-        'writethumbnail': True,
-        'verbose': True,
-        'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
-        'progress_hooks': [lambda d: download_progress_hook(d, prog_msg, loop)],
-        'js_runtimes': {'node': {}},
-        'remote_components': ['ejs:github'],
-        'extractor_args': {
-            'youtube': {'player_client': ['android', 'web']}
-        },
-        'http_headers': {'User-Agent': 'Mozilla/5.0'}
+    'outtmpl': download_path,
+    'format': 'bv*+ba/b',
+    'cookiefile': '/app/cookies/youtube.txt',
+
+    'writethumbnail': True,
+    'verbose': True,
+    'noplaylist': True,
+
+    'quiet': True,
+    'no_warnings': True,
+
+    'progress_hooks': [lambda d: download_progress_hook(d, prog_msg, loop)],
+
+    'js_runtimes': {'node': {}},
+    'remote_components': ['ejs:github'],
+
+    'retries': 10,
+    'fragment_retries': 10,
+    'skip_unavailable_fragments': True,
+
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android']   # FIXED
+        }
+    },
+
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0'
+    }
     }
 
     try:
