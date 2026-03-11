@@ -197,22 +197,23 @@ def download_progress_hook(d, msg):
         "╰─────────────────────╯"
     )
 
-    now = time.time()
-
     chat_id = msg.chat.id
+    now = time.time()
 
     if chat_id not in last_edit:
         last_edit[chat_id] = 0
 
-    # only update every 2 seconds
     if now - last_edit[chat_id] < 3:
         return
 
     last_edit[chat_id] = now
 
     try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(msg.edit_text(text))
+        loop = asyncio.get_event_loop()
+        asyncio.run_coroutine_threadsafe(
+            msg.edit_text(text),
+            loop
+        )
     except:
         pass
         
@@ -375,7 +376,8 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     'format': 'bestaudio/best',
     'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
     'cookiefile': '/app/cookies/youtube.txt',
-    'quiet': False,
+    'quiet': True,
+    'no_warnings': True,
     'noplaylist': True,
     'progress_hooks': [lambda d: download_progress_hook(d, prog_msg)],
     'js_runtimes': {'node': {}},
@@ -591,6 +593,8 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
         'writethumbnail': True,
         'verbose': True,
         'noplaylist': True,
+        'quiet': True,
+        'no_warnings': True,
         'progress_hooks': [lambda d: download_progress_hook(d, prog_msg)],
         'js_runtimes': {'node': {}},
         'remote_components': ['ejs:github'],
