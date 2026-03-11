@@ -159,73 +159,75 @@ async def fetch_video_info(url, ydl_opts, progress_message, check_duration_and_s
                 return None
         return info
 
-
 def download_progress_hook(d, msg):
-    if d['status'] != 'downloading':
-        return
+    if d['status'] == 'downloading':
 
-    downloaded = d.get('downloaded_bytes', 0)
-    total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+        total = d.get('total_bytes') or d.get('total_bytes_estimate')
+        downloaded = d.get('downloaded_bytes', 0)
+        speed = d.get('speed', 0)
+        eta = d.get('eta')
 
-    if total == 0:
-        return
+        percent = (downloaded / total * 100) if total else 0
 
-    percent = downloaded / total * 100
-    speed = d.get('speed', 0)
-    eta = d.get('eta', 0)
+        blocks = int(percent // 10)
+        bar = "♦" * blocks + "◇" * (10 - blocks)
 
-    done = downloaded / 1048576
-    total_mb = total / 1048576
-    speed_mb = speed / 1048576 if speed else 0
+        done_mb = downloaded / 1048576
+        total_mb = total / 1048576 if total else 0
+        speed_mb = speed / 1048576 if speed else 0
 
-    bar_filled = int(percent // 10)
-    bar = "♦" * bar_filled + "◇" * (10 - bar_filled)
+        # SAFE ETA
+        if eta is None:
+            eta_text = "Calculating..."
+        else:
+            eta_text = f"{int(eta//60)}m {int(eta%60)}s"
 
-    text = (
-        "╭──────────────╮\n"
-        "│ Downloading...\n"
-        "├──────────────\n"
-        f"│ {bar}\n\n"
-        f"│ Completed: {done:.1f} MB/{total_mb:.2f} MB\n"
-        f"│ Bytes: {percent:.2f}%\n"
-        f"│ Speed: {speed_mb:.2f} MB/s\n"
-        f"│ ETA: {int(eta//60)}m {int(eta%60)}s\n"
-        "╰─────────────────────╯"
-    )
-
-    try:
-        asyncio.run_coroutine_threadsafe(
-            msg.edit_text(text),
-            asyncio.get_event_loop()
+        text = (
+            "╭──────────────╮\n"
+            "│ Downloading...\n"
+            "├──────────────\n"
+            f"│ {bar}\n\n"
+            f"│ Completed: {done_mb:.1f} MB/{total_mb:.2f} MB\n"
+            f"│ Bytes: {percent:.2f}%\n"
+            f"│ Speed: {speed_mb:.2f} MB/s\n"
+            f"│ ETA: {eta_text}\n"
+            "╰─────────────────────╯"
         )
-    except:
-        pass
+
+        try:
+            asyncio.run_coroutine_threadsafe(
+                msg.edit_text(text),
+                asyncio.get_event_loop()
+            )
+        except:
+            pass
+
 # Progress callback for fast_upload
 user_progress = {}
-def progress_callback(done, total, chat_id, user_id):
-    if user_id in cancel_downloads and cancel_downloads[user_id]:
-        raise Exception("Upload cancelled by user")
+upload_data = {}
 
-    if chat_id not in user_progress:
-        user_progress[chat_id] = {
-            'previous_done': 0,
-            'previous_time': time.time()
+async def upload_progress(current, total, msg):
+
+    if msg.chat.id not in upload_data:
+        upload_data[msg.chat.id] = {
+            "last_bytes": 0,
+            "last_time": time.time()
         }
 
-    data = user_progress[chat_id]
+    data = upload_data[msg.chat.id]
 
-    percent = (done / total) * 100
+    percent = current / total * 100
     blocks = int(percent // 10)
     bar = "♦" * blocks + "◇" * (10 - blocks)
 
-    done_mb = done / 1048576
+    done_mb = current / 1048576
     total_mb = total / 1048576
 
-    speed = done - data['previous_done']
-    elapsed = time.time() - data['previous_time']
+    now = time.time()
+    speed = (current - data["last_bytes"]) / (now - data["last_time"] + 0.001)
 
-    speed_mb = (speed / elapsed) / 1048576 if elapsed > 0 else 0
-    remaining = (total - done) / (speed / elapsed) if speed > 0 else 0
+    speed_mb = speed / 1048576
+    remaining = (total - current) / speed if speed > 0 else 0
 
     eta_m = int(remaining // 60)
     eta_s = int(remaining % 60)
@@ -242,10 +244,13 @@ def progress_callback(done, total, chat_id, user_id):
         "╰─────────────────────╯"
     )
 
-    data['previous_done'] = done
-    data['previous_time'] = time.time()
+    data["last_bytes"] = current
+    data["last_time"] = now
 
-    return text
+    try:
+        await msg.edit_text(text)
+    except:
+        pass
 
 def format_duration(seconds):
     if not seconds:
