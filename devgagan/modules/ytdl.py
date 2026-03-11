@@ -297,95 +297,131 @@ async def cancel_handler(client: Client, message: Message):
 @app.on_message(filters.command("adl"))
 async def adl_handler(client: Client, message: Message):
     uid = message.from_user.id
+
+    # Prevent multiple downloads
     if users_loop.get(uid):
         await message.reply_text("⚠ You already have a running download.")
         return
+
+    # Check command usage
     if len(message.command) < 2:
         await message.reply_text("Usage: /adl <link>")
         return
+
     freecheck = await chk_user(message, uid)
+
     can, msg = await check_interval(uid, freecheck)
     if not can:
         await message.reply_text(msg)
         return
+
     url = message.command[1]
+
+    # Playlist restriction for free users
     if ("playlist" in url or "&list=" in url) and freecheck == 1:
         await message.reply_text("❌ Playlist download is only available for Premium users.")
         return
+
     users_loop[uid] = True
+
     try:
+        # Instagram
         if "instagram.com" in url:
             await process_audio(client, message, url, "INSTA_COOKIES")
+
+        # YouTube
         elif "youtube.com" in url or "youtu.be" in url:
-            await process_audio(client, message, url, "YT_COOKIES")
+
+            # Playlist detection
+            if "playlist" in url or "&list=" in url:
+                await process_audio_playlist(client, message, url, "YT_COOKIES")
+            else:
+                await process_audio(client, message, url, "YT_COOKIES")
+
+        # Other websites
         else:
             await process_audio(client, message, url)
+
+        # Free user cooldown
         if freecheck == 1:
             await set_interval(uid, 15)
+
+    except Exception as e:
+        await message.reply_text(f"❌ Error:\n`{e}`")
+
     finally:
         users_loop.pop(uid, None)
-
+        
 async def process_audio(client: Client, message: Message, url: str, cookies_env_var=None):
     uid = message.from_user.id
     prog_msg = await message.reply_text("**__Starting audio extraction...__**")
     loop = asyncio.get_running_loop()
 
-    # Determine which cookie file to use
-    cookie_file = '/app/cookies/youtube.txt'  # default static file
+    out_path = None
     temp_cookie = None
+
+    # Default cookie file
+    cookie_file = "/app/cookies/youtube.txt"
+
+    # Check env cookie
     if cookies_env_var:
-        env_value = os.getenv(cookies_env_var, '')
-        # Only use environment variable if it contains real cookie data (not a placeholder)
+        env_value = os.getenv(cookies_env_var, "")
         if env_value and env_value.strip() and env_value not in ("YT_COOKIES", "INSTA_COOKIES"):
-            with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.txt') as f:
+            with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt") as f:
                 f.write(env_value)
                 temp_cookie = f.name
             cookie_file = temp_cookie
         else:
-            logger.warning(f"Environment variable {cookies_env_var} is empty or placeholder, using static cookie file.")
+            logger.warning(f"{cookies_env_var} empty, using static cookie")
 
-    # Verify static cookie file exists, otherwise warn
-    if cookie_file == '/app/cookies/youtube.txt' and not os.path.exists(cookie_file):
-        logger.warning("Static cookie file /app/cookies/youtube.txt not found. Proceeding without cookies.")
+    if cookie_file and not os.path.exists(cookie_file):
+        logger.warning("Cookie file missing, running without cookies")
         cookie_file = None
 
     random_filename = get_random_string()
+
     ydl_opts = {
-    'format': 'bestaudio/best',
-    'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
+        "outtmpl": os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
 
-    'cookiefile': cookie_file,
+        "cookiefile": '/app/cookies/youtube.txt',
 
-    'quiet': True,
-    'no_warnings': True,
-    'noplaylist': True,
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
 
-    'retries': 10,
-    'fragment_retries': 10,
-    'concurrent_fragment_downloads': 5,
+        "retries": 10,
+        "fragment_retries": 10,
+        "concurrent_fragment_downloads": 5,
 
-    'source_address': '0.0.0.0',
+        "nocheckcertificate": True,
+        "geo_bypass": True,
+        "geo_bypass_country": "US",
 
-    'progress_hooks': [lambda d: download_progress_hook(d, prog_msg, loop)],
+        "source_address": "0.0.0.0",
 
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
+        "progress_hooks": [
+            lambda d: download_progress_hook(d, prog_msg, loop)
+        ],
 
-    'prefer_ffmpeg': True,
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
 
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'web', 'tv']
+        "prefer_ffmpeg": True,
+
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "tv"]
+            }
+        },
+
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/133 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9"
         }
-    },
-
-    'http_headers': {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/133 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9'
-    }
     }
 
     try:
@@ -393,37 +429,33 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
             await prog_msg.edit_text("**__Cancelled.__**")
             return
 
-        # Run yt-dlp in thread pool
         def sync_extract():
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 return ydl.extract_info(url, download=True)
 
         info = await asyncio.get_event_loop().run_in_executor(thread_pool, sync_extract)
 
-        # Find downloaded file
-        out_path = None
-        for f in os.listdir(DOWNLOAD_DIR):
-            if f.startswith(random_filename) and not f.endswith('.part'):
-                out_path = os.path.join(DOWNLOAD_DIR, f)
-                break
+        # safer file detection
+        files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{random_filename}*"))
+        if files:
+            out_path = files[0]
 
         if not out_path or not os.path.exists(out_path):
             await prog_msg.edit_text("**__Downloaded file not found!__**")
             return
 
-        # If not already MP3, manually convert
-        if not out_path.endswith('.mp3'):
+        # convert to mp3 if needed
+        if not out_path.endswith(".mp3"):
             mp3_path = os.path.join(DOWNLOAD_DIR, f"{random_filename}.mp3")
-            try:
-                subprocess.run([
-                    'ffmpeg', '-i', out_path, '-q:a', '0', '-map', 'a', mp3_path, '-y'
-                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                os.remove(out_path)
-                out_path = mp3_path
-            except Exception as e:
-                logger.error(f"Manual conversion failed: {e}")
-                await prog_msg.edit_text("**__Audio conversion failed.__**")
-                return
+
+            subprocess.run(
+                ["ffmpeg", "-i", out_path, "-q:a", "0", "-map", "a", mp3_path, "-y"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            os.remove(out_path)
+            out_path = mp3_path
 
         if await check_cancelled(uid):
             await prog_msg.edit_text("**__Cancelled.__**")
@@ -431,23 +463,30 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
             return
 
         title = info.get("title", "Audio")
+
         await prog_msg.edit_text("**__Editing metadata...__**")
 
         def meta():
             audio = MP3(out_path, ID3=ID3)
+
             try:
                 audio.add_tags()
             except:
                 pass
+
             audio.tags["TIT2"] = TIT2(encoding=3, text=title)
-            audio.tags["TPE1"] = TPE1(encoding=3, text="Team SPY")
-            audio.tags["COMM"] = COMM(encoding=3, lang="eng", text="Powered by Team SPY")
+            audio.tags["TPE1"] = TPE1(encoding=3, text="Team JB")
+            audio.tags["COMM"] = COMM(encoding=3, lang="eng", text="Powered by Team JB")
+
             thumb_url = info.get("thumbnail")
+
             if thumb_url:
                 thumb_path = os.path.join(tempfile.gettempdir(), f"{get_random_string()}.jpg")
+
                 r = requests.get(thumb_url)
                 with open(thumb_path, "wb") as f:
                     f.write(r.content)
+
                 with open(thumb_path, "rb") as img:
                     audio.tags["APIC"] = APIC(
                         encoding=3,
@@ -455,7 +494,9 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
                         type=3,
                         data=img.read()
                     )
+
                 os.remove(thumb_path)
+
             audio.save()
 
         await asyncio.to_thread(meta)
@@ -484,43 +525,70 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     except Exception as e:
         logger.exception("Audio error")
         await message.reply_text(f"**__Error: {e}__**")
+
     finally:
         if out_path and os.path.exists(out_path):
             os.remove(out_path)
+
         if temp_cookie and os.path.exists(temp_cookie):
             os.remove(temp_cookie)
+
         cancel_downloads.pop(uid, None)
 
 async def process_audio_playlist(client, message, url, cookies_env_var):
     uid = message.from_user.id
     prog = await message.reply_text("**__Extracting playlist...__**")
+
     try:
-        ydl_opts = {'quiet': True, 'extract_flat': True}
+        ydl_opts = {
+            "quiet": True,
+            "extract_flat": True
+        }
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-        if 'entries' not in info:
+
+        if "entries" not in info:
             await prog.edit_text("**__No playlist found.__**")
             return await process_audio(client, message, url, cookies_env_var)
-        total = len(info['entries'])
-        await prog.edit_text(f"**__Playlist: {info.get('title','')}__**\n**Total: {total}**")
-        good = fail = 0
-        for entry in info['entries']:
+
+        total = len(info["entries"])
+        good = 0
+        fail = 0
+
+        await prog.edit_text(
+            f"**__Playlist: {info.get('title','')}__**\n**Total: {total}**"
+        )
+
+        for entry in info["entries"]:
+
             if await check_cancelled(uid):
-                await message.reply_text(f"**__Cancelled. Downloaded: {good}/{total}__**")
+                await message.reply_text(
+                    f"**__Cancelled. Downloaded: {good}/{total}__**"
+                )
                 return
+
             vid_url = f"https://youtube.com/watch?v={entry['id']}"
+
             try:
                 await process_audio(client, message, vid_url, cookies_env_var)
                 good += 1
             except Exception as e:
                 fail += 1
                 logger.error(f"Failed {vid_url}: {e}")
-            await prog.edit_text(f"**__Progress: {good}/{total} downloaded, {fail} failed.__**")
+
+            await prog.edit_text(
+                f"**__Progress: {good}/{total} downloaded, {fail} failed.__**"
+            )
+
             await asyncio.sleep(1)
-        await message.reply_text(f"**__Playlist done! Success: {good}, Failed: {fail}__**")
+
+        await message.reply_text(
+            f"**__Playlist done! Success: {good}, Failed: {fail}__**"
+        )
+
     except Exception as e:
         await message.reply_text(f"**__Error: {e}__**")
-
   # -------------------------------------------------------------------
 #  Video download
 # -------------------------------------------------------------------
@@ -600,7 +668,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     ydl_opts = {
     'format': 'bestvideo+bestaudio/best',
     'outtmpl': download_path,
-    'cookiefile': cookie_file,
+    'cookiefile': '/app/cookies/youtube.txt',
 
     'quiet': True,
     'no_warnings': True,
