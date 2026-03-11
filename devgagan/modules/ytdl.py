@@ -258,36 +258,6 @@ async def adl_handler(client: Client, message: Message):
     finally:
         users_loop.pop(uid, None)
 
-@app.on_message(filters.command("adl"))
-async def adl_handler(client: Client, message: Message):
-    uid = message.from_user.id
-    if ongoing_downloads.get(uid):
-        await message.reply_text("**You already have an ongoing download.**")
-        return
-    if len(message.command) < 2:
-        await message.reply_text("**Usage:** `/adl <link>`")
-        return
-
-    url = message.command[1]
-    ongoing_downloads[uid] = True
-    cancel_downloads.pop(uid, None)
-
-    try:
-        # Choose cookies based on platform
-        if "instagram.com" in url:
-            cookies_env_var = "INSTA_COOKIES"
-        elif "youtube.com" in url or "youtu.be" in url:
-            cookies_env_var = "YT_COOKIES"
-        else:
-            cookies_env_var = None
-
-        await process_audio(client, message, url, cookies_env_var)
-
-    except Exception as e:
-        await message.reply_text(f"**Error:** `{e}`")
-    finally:
-        ongoing_downloads.pop(uid, None)
-
 # ---------------- process audio ----------------
 async def process_audio(client: Client, message: Message, url: str, cookies_env_var=None):
     uid = message.from_user.id
