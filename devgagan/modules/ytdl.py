@@ -395,7 +395,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     loop = asyncio.get_running_loop()  # get loop
     
     ydl_opts = {
-    'format': 'bestaudio/best/best',
+    'format': 'bestaudio*+bestaudio/best',
     'merge_output_format': 'mp3',      
     'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
     'cookiefile': '/app/cookies/youtube.txt',
@@ -624,7 +624,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     # yt-dlp options
     ydl_opts = {
     'outtmpl': download_path,
-    'format': 'bestvideo+bestaudio/best',  # keep this for video+aud
+    'format': 'bestvideo*+bestaudio/best'  # keep this for video+aud
     'merge_output_format': 'mp4',   
     'cookiefile': '/app/cookies/youtube.txt',
 
