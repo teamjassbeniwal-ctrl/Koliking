@@ -159,45 +159,65 @@ async def fetch_video_info(url, ydl_opts, progress_message, check_duration_and_s
                 return None
         return info
 
+last_edit = {}
+
 def download_progress_hook(d, msg):
 
-    if d['status'] == 'downloading':
+    if d['status'] != 'downloading':
+        return
 
-        percent = d.get('_percent_str', '0%')
-        speed = d.get('_speed_str', '0')
-        eta = d.get('_eta_str', '0')
+    downloaded = d.get('downloaded_bytes', 0)
+    total = d.get('total_bytes') or d.get('total_bytes_estimate') or 1
 
-        downloaded = d.get('downloaded_bytes', 0)
-        total = d.get('total_bytes') or d.get('total_bytes_estimate') or 1
+    percent = downloaded / total * 100
 
-        percent_float = downloaded / total * 100
+    blocks = int(percent // 10)
+    bar = "♦" * blocks + "◇" * (10 - blocks)
 
-        blocks = int(percent_float // 10)
-        bar = "♦" * blocks + "◇" * (10 - blocks)
+    done_mb = downloaded / 1048576
+    total_mb = total / 1048576
 
-        done_mb = downloaded / 1048576
-        total_mb = total / 1048576
+    speed = d.get('speed', 0) or 0
+    eta = d.get('eta', 0) or 0
 
-        text = (
-            "╭──────────────╮\n"
-            "│ Downloading...\n"
-            "├──────────────\n"
-            f"│ {bar}\n\n"
-            f"│ Completed: {done_mb:.2f} MB/{total_mb:.2f} MB\n"
-            f"│ Bytes: {percent}\n"
-            f"│ Speed: {speed}\n"
-            f"│ ETA: {eta}\n"
-            "╰─────────────────────╯"
-        )
+    speed_mb = speed / 1048576
 
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(msg.edit_text(text))
-        except RuntimeError:
-            pass
+    eta_m = int(eta // 60)
+    eta_s = int(eta % 60)
+
+    text = (
+        "╭──────────────╮\n"
+        "│ Downloading...\n"
+        "├──────────────\n"
+        f"│ {bar}\n\n"
+        f"│ Completed: {done_mb:.2f} MB/{total_mb:.2f} MB\n"
+        f"│ Bytes: {percent:.2f}%\n"
+        f"│ Speed: {speed_mb:.2f} MB/s\n"
+        f"│ ETA: {eta_m}m {eta_s}s\n"
+        "╰─────────────────────╯"
+    )
+
+    now = time.time()
+
+    chat_id = msg.chat.id
+
+    if chat_id not in last_edit:
+        last_edit[chat_id] = 0
+
+    # only update every 2 seconds
+    if now - last_edit[chat_id] < 2:
+        return
+
+    last_edit[chat_id] = now
+
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(msg.edit_text(text))
+    except:
+        pass
         
 # Progress callback for fast_upload
-user_progress = {}
+upload_last_edit = {}
 upload_data = {}
 
 async def upload_progress(current, total, msg):
@@ -211,6 +231,7 @@ async def upload_progress(current, total, msg):
     data = upload_data[msg.chat.id]
 
     percent = current / total * 100
+
     blocks = int(percent // 10)
     bar = "♦" * blocks + "◇" * (10 - blocks)
 
@@ -218,20 +239,31 @@ async def upload_progress(current, total, msg):
     total_mb = total / 1048576
 
     now = time.time()
+
+    # limit edits
+    if msg.chat.id not in upload_last_edit:
+        upload_last_edit[msg.chat.id] = 0
+
+    if now - upload_last_edit[msg.chat.id] < 2:
+        return
+
+    upload_last_edit[msg.chat.id] = now
+
     speed = (current - data["last_bytes"]) / (now - data["last_time"] + 0.001)
-
     speed_mb = speed / 1048576
-    remaining = (total - current) / speed if speed > 0 else 0
 
-    eta_m = int(remaining // 60)
-    eta_s = int(remaining % 60)
+    remaining = total - current
+    eta = remaining / speed if speed > 0 else 0
+
+    eta_m = int(eta // 60)
+    eta_s = int(eta % 60)
 
     text = (
         "╭──────────────╮\n"
         "│ Pyro Uploader\n"
         "├──────────────\n"
         f"│ {bar}\n\n"
-        f"│ Completed: {done_mb:.1f} MB/{total_mb:.2f} MB\n"
+        f"│ Completed: {done_mb:.2f} MB/{total_mb:.2f} MB\n"
         f"│ Bytes: {percent:.2f}%\n"
         f"│ Speed: {speed_mb:.2f} MB/s\n"
         f"│ ETA: {eta_m}m, {eta_s}s\n"
