@@ -422,7 +422,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
     download_path = os.path.join(DOWNLOAD_DIR, f"{out_name}.%(ext)s")
 
     # yt-dlp options
-     ydl_opts = {
+    ydl_opts = {
         'outtmpl': download_path,
         'format': 'bv*+ba/b',
         'cookiefile': '/app/cookies/youtube.txt',
@@ -435,7 +435,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
             'youtube': {'player_client': ['android', 'web']}
         },
         'http_headers': {'User-Agent': 'Mozilla/5.0'}
-     }
+    }
 
     prog_msg = await message.reply_text("**Starting download...**")
 
