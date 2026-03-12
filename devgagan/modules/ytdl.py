@@ -192,31 +192,6 @@ async def adl_handler(client: Client, message: Message):
     if len(message.command) < 2:
         await message.reply_text("**Usage:** `/adl <link>`")
         return
-    url = message.command[1]
-    ongoing_downloads[uid] = True
-    if uid in cancel_downloads:
-        del cancel_downloads[uid]
-    try:
-        if "instagram.com" in url:
-            await process_audio(client, message, url, "INSTA_COOKIES")
-        elif "youtube.com" in url or "youtu.be" in url:
-            await process_audio(client, message, url, "YT_COOKIES")
-        else:
-            await process_audio(client, message, url)
-    except Exception as e:
-        await message.reply_text(f"**Error:** `{e}`")
-    finally:
-        ongoing_downloads.pop(uid, None)
-
-@app.on_message(filters.command("adl"))
-async def adl_handler(client: Client, message: Message):
-    uid = message.from_user.id
-    if ongoing_downloads.get(uid):
-        await message.reply_text("**You already have an ongoing download.**")
-        return
-    if len(message.command) < 2:
-        await message.reply_text("**Usage:** `/adl <link>`")
-        return
 
     url = message.command[1]
     ongoing_downloads[uid] = True
@@ -354,7 +329,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
                 caption=f"**{title}**\n\n__Powered by Team JB__",
                 title=title,
                 performer="Team JB",
-                progress=progress_callback,
+                progress=progress_bar,
                 progress_args=(message.chat.id, uid)
             )
         finally:
@@ -549,7 +524,7 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
                     width=width,
                     height=height,
                     thumb=thumb if thumb and os.path.exists(thumb) else None,
-                    progress=progress_callback,
+                    progress=progress_bar,
                     progress_args=(chat, uid)
                 )
             finally:
