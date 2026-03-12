@@ -380,51 +380,50 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
         cookie_file = None
 
     random_filename = get_random_string()
+ydl_opts = {
+    "format": "bestaudio[ext=m4a]/bestaudio/best",
+    "outtmpl": os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
 
-    ydl_opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio/best",
-        "outtmpl": os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
+    "cookiefile": YT_COOKIES,
 
-        "cookiefile": '/app/cookies/youtube.txt',
+    "quiet": True,
+    "no_warnings": True,
+    "noplaylist": True,
 
-        "quiet": True,
-        "no_warnings": True,
-        "noplaylist": True,
+    "retries": 10,
+    "fragment_retries": 10,
+    "concurrent_fragment_downloads": 5,
 
-        "retries": 10,
-        "fragment_retries": 10,
-        "concurrent_fragment_downloads": 5,
+    "nocheckcertificate": True,
+    "geo_bypass": True,
+    "geo_bypass_country": "US",
 
-        "nocheckcertificate": True,
-        "geo_bypass": True,
-        "geo_bypass_country": "US",
+    "source_address": "0.0.0.0",
 
-        "source_address": "0.0.0.0",
+    "progress_hooks": [
+        lambda d: download_progress_hook(d, prog_msg, loop)
+    ],
 
-        "progress_hooks": [
-            lambda d: download_progress_hook(d, prog_msg, loop)
-        ],
+    "postprocessors": [{
+        "key": "FFmpegExtractAudio",
+        "preferredcodec": "mp3",
+        "preferredquality": "192",
+    }],
 
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
+    "prefer_ffmpeg": True,
 
-        "prefer_ffmpeg": True,
-
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "tv"]
-            }
-        },
-
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/133 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9"
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["android", "web", "tv"]
         }
-    }
+    },
 
+    "http_headers": {
+        "User-Agent": "Mozilla/5.0",
+        "Accept-Language": "en-US,en;q=0.9"
+    }
+}
+    
     try:
         if await check_cancelled(uid):
             await prog_msg.edit_text("**__Cancelled.__**")
