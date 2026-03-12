@@ -239,7 +239,6 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     'quiet': False,
     'noplaylist': True,
     'js_runtimes': {'node': {}},
-    'remote_components': ['ejs:github'],
     'postprocessors': [{
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'mp3',
@@ -247,7 +246,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     }],
     'extractor_args': {
         'youtube': {
-            'player_client': ['android', 'web']
+            'player_client': ['web']
         }
     },
     'http_headers': {
@@ -430,9 +429,8 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
         'verbose': True,
         'noplaylist': True,
         'js_runtimes': {'node': {}},
-        'remote_components': ['ejs:github'],
         'extractor_args': {
-            'youtube': {'player_client': ['android', 'web']}
+            'youtube': {'player_client': ['web']}
         },
         'http_headers': {'User-Agent': 'Mozilla/5.0'}
     }
