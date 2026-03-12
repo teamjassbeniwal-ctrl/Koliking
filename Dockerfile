@@ -28,8 +28,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
-# Create required folders
+# Ensure cookies exist
 RUN mkdir -p /app/cookies
+COPY cookies/youtube.txt /app/cookies/youtube.txt
+
+# Create downloads folder
 RUN mkdir -p /app/downloads
 
 # Expose port
