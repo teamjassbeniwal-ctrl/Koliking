@@ -8,7 +8,7 @@ from os import getenv
 INST_COOKIES = """
 # wtite up here insta cookies
 """
-YTUB_COOKIES = "cookies/youtube.txt"
+YTUB_COOKIES = "/app/cookies/youtube.txt"
 
 API_ID = int(getenv("API_ID", "25331263"))
 API_HASH = getenv("API_HASH", "cab85305bf85125a2ac053210bcd1030")
