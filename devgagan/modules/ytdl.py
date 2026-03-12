@@ -380,7 +380,7 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
         cookie_file = None
 
     random_filename = get_random_string()
-ydl_opts = {
+    ydl_opts = {
     "format": "bestaudio[ext=m4a]/bestaudio/best",
     "outtmpl": os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
 
@@ -422,7 +422,8 @@ ydl_opts = {
         "User-Agent": "Mozilla/5.0",
         "Accept-Language": "en-US,en;q=0.9"
     }
-}
+    }
+
     
     try:
         if await check_cancelled(uid):
