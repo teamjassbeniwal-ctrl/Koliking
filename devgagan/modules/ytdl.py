@@ -236,18 +236,30 @@ async def process_audio(client: Client, message: Message, url: str, cookies_env_
     'format': 'bestaudio/best',
     'outtmpl': os.path.join(DOWNLOAD_DIR, f"{random_filename}.%(ext)s"),
     'cookiefile': '/app/cookies/youtube.txt',
-    'quiet': False,
+    'quiet': True,
+    'no_warnings': True,
     'noplaylist': True,
-    'js_runtimes': {'node': {}},
+
+    'retries': 10,
+    'fragment_retries': 10,
+
     'postprocessors': [{
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'mp3',
         'preferredquality': '192',
     }],
+
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['ios']
+        }
+    },
+
     'http_headers': {
         'User-Agent': 'Mozilla/5.0'
     }
     }
+    
     prog_msg = await message.reply_text("**__Starting audio extraction...__**")
 
     try:
@@ -416,14 +428,27 @@ async def process_video(client, message, url, cookies_env_var, check_duration):
 
     # yt-dlp options
     ydl_opts = {
-        'outtmpl': download_path,
-        'format': 'bv*+ba/b',
-        'cookiefile': '/app/cookies/youtube.txt',
-        'writethumbnail': True,
-        'verbose': True,
-        'noplaylist': True,
-        'js_runtimes': {'node': {}},
-        'http_headers': {'User-Agent': 'Mozilla/5.0'}
+    'outtmpl': download_path,
+    'format': 'bv*+ba/b',
+    'cookiefile': '/app/cookies/youtube.txt',
+    'writethumbnail': True,
+
+    'quiet': True,
+    'no_warnings': True,
+    'noplaylist': True,
+
+    'retries': 10,
+    'fragment_retries': 10,
+
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['ios']
+        }
+    },
+
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0'
+    }
     }
 
     prog_msg = await message.reply_text("**Starting download...**")
